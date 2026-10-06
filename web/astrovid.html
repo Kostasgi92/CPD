@@ -1,0 +1,1045 @@
+<title>AstroVid</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Commissioner:wght@400;500;600;700&family=GFS+Didot&family=JetBrains+Mono:wght@400;600&display=swap">
+<style>
+/* Layout: a viewing-room — the player is the hero, the "new video" desk sits beside it; reading tabs below. Narrowband (SHO) palette: H-alpha red, OIII teal, SII amber on deep-space ink. */
+:root {
+  --ink: #0a0e1c;
+  --panel: #121830;
+  --panel-2: #1a2142;
+  --line: #2a335c;
+  --fg: #e7eaf6;
+  --muted: #9aa3c7;
+  --halpha: #ff6b81;
+  --oiii: #5fd6c8;
+  --sii: #f2b45c;
+  --ok: #6fdc8c;
+  --warn: #f2b45c;
+  --bad: #ff6b81;
+  --display: "GFS Didot", "Didot", "Bodoni 72", Georgia, serif;
+  --body: "Commissioner", "Segoe UI", system-ui, -apple-system, sans-serif;
+  --mono: "JetBrains Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+body { background: var(--ink); color: var(--fg); font-family: var(--body); font-size: 15px; line-height: 1.55; }
+.wrap { max-width: 1240px; margin: 0 auto; padding-inline: 20px; padding-block: 20px 48px; display: grid; grid-template-columns: minmax(0, 1fr); gap: 20px; }
+@media (max-width: 480px) { .wrap { padding-inline: 16px; } }
+header { display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px 16px; }
+header h1 { font-family: var(--display); font-weight: 400; font-size: 34px; margin: 0; letter-spacing: .5px; }
+header h1 span { color: var(--halpha); }
+header p { margin: 0; color: var(--muted); max-width: 70ch; }
+.main { display: grid; grid-template-columns: minmax(0, 1fr) 360px; gap: 20px; align-items: start; }
+@media (max-width: 920px) { .main { grid-template-columns: minmax(0, 1fr); } }
+
+/* player */
+.player { display: grid; gap: 10px; min-width: 0; }
+.stage { position: relative; background: #000; border-radius: 10px; overflow: hidden; border: 1px solid var(--line); }
+.stage canvas { display: block; width: 100%; height: auto; }
+.stage.vertical { max-width: 420px; margin-inline: auto; width: 100%; }
+.badge { position: absolute; top: 10px; right: 10px; font: 600 11px/1 var(--body); letter-spacing: .08em; text-transform: uppercase; background: rgba(10,14,28,.75); color: var(--sii); border: 1px solid var(--sii); padding: 5px 8px; border-radius: 4px; }
+.bigplay { position: absolute; inset: 0; display: grid; place-items: center; background: transparent; border: 0; cursor: pointer; }
+.bigplay span { width: 78px; height: 78px; border-radius: 50%; background: rgba(10,14,28,.7); border: 2px solid var(--fg); display: grid; place-items: center; }
+.bigplay svg { margin-left: 6px; }
+.controls { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.controls .grow { flex: 1 1 160px; min-width: 0; }
+.progress { height: 6px; background: var(--panel-2); border-radius: 3px; overflow: hidden; }
+.progress i { display: block; height: 100%; width: 0; background: linear-gradient(90deg, var(--oiii), var(--halpha)); transition: width .3s; }
+.time { font: 12px var(--mono); color: var(--muted); font-variant-numeric: tabular-nums; }
+button, select, input, textarea { font: inherit; color: inherit; }
+.btn { background: var(--panel-2); border: 1px solid var(--line); border-radius: 6px; padding: 7px 12px; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; }
+.btn:hover:not(:disabled) { border-color: var(--muted); }
+.btn:disabled { opacity: .45; cursor: not-allowed; }
+.btn.primary { background: var(--halpha); border-color: var(--halpha); color: #1a0710; font-weight: 600; }
+.btn.icon { padding: 7px 9px; }
+:focus-visible { outline: 2px solid var(--oiii); outline-offset: 2px; }
+.chips { display: flex; gap: 6px; overflow-x: auto; padding-bottom: 4px; }
+.chip { flex: 0 0 auto; font-size: 12px; padding: 4px 10px; border-radius: 999px; border: 1px solid var(--line); background: transparent; cursor: pointer; color: var(--muted); max-width: 220px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.chip.on { color: var(--fg); border-color: var(--oiii); background: rgba(95,214,200,.12); }
+.note { font-size: 13px; color: var(--muted); }
+.note.warn { color: var(--warn); }
+
+/* desk */
+.desk { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 18px; display: grid; gap: 14px; min-width: 0; }
+.desk h2 { font-family: var(--display); font-weight: 400; font-size: 24px; margin: 0; }
+label { display: grid; gap: 5px; font-size: 13px; color: var(--muted); }
+input[type=text], textarea, select { background: var(--ink); border: 1px solid var(--line); border-radius: 6px; padding: 8px 10px; color: var(--fg); width: 100%; }
+textarea { resize: vertical; min-height: 92px; }
+.row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.range { display: flex; align-items: center; gap: 10px; }
+.range input { flex: 1; accent-color: var(--halpha); }
+.range output { font: 600 13px var(--mono); min-width: 4.5ch; text-align: right; }
+.steps { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.steps li { display: grid; grid-template-columns: 22px 1fr; gap: 8px; font-size: 13px; align-items: start; }
+.steps .dot { width: 14px; height: 14px; margin-top: 3px; border-radius: 50%; border: 2px solid var(--line); }
+.steps li[data-s=run] .dot { border-color: var(--oiii); border-top-color: transparent; animation: spin 1s linear infinite; }
+.steps li[data-s=done] .dot { background: var(--ok); border-color: var(--ok); }
+.steps li[data-s=err] .dot { background: var(--bad); border-color: var(--bad); }
+.steps small { display: block; color: var(--muted); }
+@keyframes spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .steps li[data-s=run] .dot { animation: none; } }
+.live { font-size: 13px; color: var(--muted); background: var(--ink); border: 1px solid var(--line); border-radius: 6px; padding: 10px; max-height: 160px; overflow: auto; white-space: pre-wrap; }
+.err { color: var(--bad); font-size: 13px; }
+details.lib summary { cursor: pointer; font-size: 13px; color: var(--muted); }
+.lib ul { list-style: none; padding: 0; margin: 8px 0 0; display: grid; gap: 4px; }
+.lib button { background: none; border: 0; padding: 4px 0; cursor: pointer; text-align: left; color: var(--fg); text-decoration: underline; text-decoration-color: var(--line); text-underline-offset: 3px; }
+
+/* reading tabs */
+.tabs { display: flex; gap: 2px; border-bottom: 1px solid var(--line); overflow-x: auto; }
+.tab { background: none; border: 0; border-bottom: 2px solid transparent; padding: 10px 14px; cursor: pointer; color: var(--muted); white-space: nowrap; }
+.tab[aria-selected=true] { color: var(--fg); border-bottom-color: var(--halpha); }
+.pane { padding-block: 16px; max-width: 78ch; }
+.pane h3 { font-family: var(--display); font-weight: 400; font-size: 22px; margin: 18px 0 6px; }
+.pane h3:first-child { margin-top: 0; }
+.answer { white-space: pre-wrap; }
+.scene { padding-block: 10px; border-bottom: 1px solid var(--line); }
+.scene b { display: block; }
+.scene .meta { font-size: 12px; color: var(--muted); margin-top: 4px; }
+.ref { padding-block: 10px; border-bottom: 1px solid var(--line); display: grid; gap: 4px; }
+.ref .kind { font: 600 10px/1 var(--body); letter-spacing: .08em; text-transform: uppercase; padding: 4px 6px; border-radius: 3px; justify-self: start; }
+.kind.peer { color: var(--ok); border: 1px solid var(--ok); }
+.kind.review, .kind.book { color: var(--oiii); border: 1px solid var(--oiii); }
+.kind.magazine, .kind.agency { color: var(--sii); border: 1px solid var(--sii); }
+.ref a { color: var(--oiii); font-size: 13px; margin-right: 12px; }
+.disclaimer { border-left: 3px solid var(--sii); padding: 8px 12px; background: var(--panel); font-size: 13px; color: var(--muted); }
+code { font-family: var(--mono); font-size: 12px; }
+</style>
+
+<div class="wrap">
+  <header>
+    <h1>Astro<span>Vid</span></h1>
+    <p>Γράφεις ερώτηση αστροφυσικής και παίρνεις βίντεο 2–5 λεπτών. Βάση του βίντεο είναι η απάντηση του Claude, που μετά ελέγχεται για ακρίβεια.</p>
+  </header>
+
+  <div class="main">
+    <section class="player" aria-label="Προβολή βίντεο">
+      <div class="stage" id="stage">
+        <canvas id="cv" width="1280" height="720" aria-label="Βίντεο"></canvas>
+        <span class="badge" id="exampleBadge">Παράδειγμα</span>
+        <button class="bigplay" id="bigplay" aria-label="Αναπαραγωγή"><span><svg width="28" height="32" viewBox="0 0 28 32"><path d="M0 0 L28 16 L0 32 Z" fill="#e7eaf6"/></svg></span></button>
+      </div>
+      <div class="controls">
+        <button class="btn icon" id="prev" aria-label="Προηγούμενη σκηνή">⏮</button>
+        <button class="btn" id="play">▶ Αναπαραγωγή</button>
+        <button class="btn icon" id="next" aria-label="Επόμενη σκηνή">⏭</button>
+        <div class="grow"><div class="progress"><i id="bar"></i></div></div>
+        <span class="time" id="time">0/0</span>
+        <button class="btn icon" id="fs" aria-label="Πλήρης οθόνη">⛶</button>
+      </div>
+      <div class="chips" id="chips"></div>
+      <div class="controls">
+        <label style="flex:1 1 220px">Φωνή
+          <select id="voice"></select>
+        </label>
+        <label style="flex:0 1 150px">Ταχύτητα
+          <div class="range"><input type="range" id="rate" min="0.7" max="1.3" step="0.05" value="1"><output id="rateOut">1,00×</output></div>
+        </label>
+        <label style="flex:0 1 150px">Μορφή
+          <select id="aspect"><option value="h">Οριζόντιο 16:9</option><option value="v">Κάθετο 9:16</option></select>
+        </label>
+      </div>
+      <p class="note" id="voiceNote"></p>
+      <div class="controls">
+        <button class="btn" id="dlScript" hidden>⬇ Σενάριο & πηγές (.md)</button>
+        <button class="btn" id="record" hidden>⏺ Εγγραφή βίντεο WebM (χωρίς φωνή)</button>
+        <span class="note" id="dlNote"></span>
+      </div>
+    </section>
+
+    <aside class="desk" aria-label="Νέο βίντεο">
+      <h2>Νέο βίντεο</h2>
+      <form id="form">
+        <div style="display:grid;gap:12px">
+          <label for="topic">Θέμα
+            <input type="text" id="topic" placeholder="π.χ. Η ένταση του Hubble" required>
+          </label>
+          <label for="desc">Περιγραφή / ερώτηση
+            <textarea id="desc" placeholder="π.χ. Γιατί διαφωνούν οι μετρήσεις του ρυθμού διαστολής του Σύμπαντος; Τι δείχνουν τα νέα δεδομένα;"></textarea>
+          </label>
+          <div class="row">
+            <label for="lang">Γλώσσα
+              <select id="lang"><option value="el">Ελληνικά</option><option value="en">English</option></select>
+            </label>
+            <label for="minutes">Διάρκεια
+              <div class="range"><input type="range" id="minutes" min="2" max="5" step="0.5" value="3"><output id="minOut">3′</output></div>
+            </label>
+          </div>
+          <button class="btn primary" id="go" type="submit">Δημιουργία βίντεο</button>
+          <button class="btn" id="stop" type="button" hidden>Διακοπή</button>
+        </div>
+      </form>
+      <ol class="steps" id="steps">
+        <li data-s="idle"><span class="dot"></span><div>Το Claude απαντά στην ερώτηση<small>η βάση του βίντεο</small></div></li>
+        <li data-s="idle"><span class="dot"></span><div>Σενάριο, γραφικά και πηγές<small>με βάση την απάντηση</small></div></li>
+        <li data-s="idle"><span class="dot"></span><div>Επιστημονικός έλεγχος<small>διόρθωση λαθών και πηγών</small></div></li>
+      </ol>
+      <div class="live" id="live" hidden></div>
+      <p class="err" id="err" hidden></p>
+      <p class="note" id="sampleNote" hidden>Η δημιουργία βίντεο χρειάζεται πρόσβαση στο Claude, που δεν είναι διαθέσιμη σε αυτή την προβολή. Μπορείς ακόμα να δεις το παράδειγμα.</p>
+      <details class="lib" id="lib" hidden><summary>Τα βίντεό μου</summary><ul id="libList"></ul></details>
+      <p class="note">Χρησιμοποιεί τη δική σου χρήση Claude: 3 κλήσεις ανά βίντεο, περίπου 2–4 λεπτά.</p>
+    </aside>
+  </div>
+
+  <section>
+    <div class="tabs" role="tablist">
+      <button class="tab" role="tab" aria-selected="true" data-pane="pAnswer" id="tAnswer">Απάντηση Claude</button>
+      <button class="tab" role="tab" aria-selected="false" data-pane="pScript" id="tScript">Σενάριο</button>
+      <button class="tab" role="tab" aria-selected="false" data-pane="pRefs" id="tRefs">Πηγές</button>
+      <button class="tab" role="tab" aria-selected="false" data-pane="pCheck" id="tCheck">Έλεγχος</button>
+    </div>
+    <div class="pane" id="pAnswer" role="tabpanel"></div>
+    <div class="pane" id="pScript" role="tabpanel" hidden></div>
+    <div class="pane" id="pRefs" role="tabpanel" hidden></div>
+    <div class="pane" id="pCheck" role="tabpanel" hidden></div>
+  </section>
+</div>
+
+<script>
+"use strict";
+/* ------------------------------------------------------------------ example */
+const EXAMPLE = {
+  example: true,
+  topic: "Αστέρες νετρονίων",
+  question: "Αστέρες νετρονίων\n\nΤι είναι, πώς σχηματίζονται και γιατί είναι τόσο πυκνοί;",
+  lang: "el",
+  answer: "Οι αστέρες νετρονίων είναι τα συμπαγή υπολείμματα αστέρων με μεγάλη μάζα που κατέρρευσαν σε έκρηξη σουπερνόβα.\n\nΣχηματισμός: όταν ένας αστέρας με μάζα περίπου 8 φορές τη μάζα του Ήλιου ή μεγαλύτερη εξαντλεί τα καύσιμά του, ο σιδερένιος πυρήνας του δεν μπορεί πια να στηριχτεί και καταρρέει. Πρωτόνια και ηλεκτρόνια ενώνονται σε νετρόνια, και η κατάρρευση σταματά όταν η πίεση εκφυλισμού των νετρονίων και οι πυρηνικές δυνάμεις αντισταθούν στη βαρύτητα.\n\nΜέγεθος και πυκνότητα: τυπική μάζα περίπου 1,4 ηλιακές μάζες σε ακτίνα περίπου 12 km. Η μέση πυκνότητα είναι συγκρίσιμη ή μεγαλύτερη από την πυκνότητα των ατομικών πυρήνων, δηλαδή κάποιες εκατοντάδες εκατομμύρια τόνους ανά κυβικό εκατοστό.\n\nΠάλσαρ: πολλοί περιστρέφονται γρήγορα και έχουν ισχυρά μαγνητικά πεδία. Οι δέσμες ακτινοβολίας τους φαίνονται σαν παλμοί (ανακάλυψη 1967, Jocelyn Bell Burnell).\n\nΜέγιστη μάζα: πάνω από περίπου 2–2,3 ηλιακές μάζες η ύλη δεν αντέχει και σχηματίζεται μαύρη τρύπα. Ο PSR J0740+6620 έχει μετρημένη μάζα περίπου 2,08 ηλιακές μάζες.\n\nΣυγχωνεύσεις: το 2017 το LIGO/Virgo ανίχνευσε βαρυτικά κύματα από συγχώνευση δύο αστέρων νετρονίων (GW170817), μαζί με έκλαμψη ακτίνων γάμμα και κιλονόβα.\n\nΑνοιχτό ερώτημα: η καταστατική εξίσωση της ύλης στον πυρήνα, δηλαδή αν περιέχει υπερόνια ή ελεύθερα κουάρκ.",
+  script: {
+    title: "Αστέρες νετρονίων",
+    subtitle: "Μια πόλη με μάζα μεγαλύτερη από του Ήλιου",
+    scenes: [
+      { heading: "Ένα κουταλάκι, ένα βουνό", visual: "nebula", callout: { value: "≈ 2 δισ. τόνοι", label: "ένα κουταλάκι ύλης" }, refs: ["R6"],
+        narration: "Αν έπαιρνες ένα κουταλάκι του γλυκού από την ύλη ενός αστέρα νετρονίων, θα ζύγιζε περίπου δύο δισεκατομμύρια τόνους. Πώς μπορεί να υπάρχει κάτι τόσο πυκνό στο Σύμπαν;" },
+      { heading: "Πώς γεννιούνται", visual: "star", callout: null, refs: ["R6"],
+        narration: "Όταν ένας αστέρας με μάζα περίπου οκτώ φορές μεγαλύτερη από του Ήλιου ή και παραπάνω εξαντλεί τα καύσιμά του, ο πυρήνας του καταρρέει μέσα σε κλάσματα του δευτερολέπτου. Τα εξωτερικά στρώματα εκτινάσσονται σε μια έκρηξη σουπερνόβα. Ο πυρήνας συμπιέζεται τόσο πολύ, που πρωτόνια και ηλεκτρόνια ενώνονται και γίνονται νετρόνια." },
+      { heading: "Μια πόλη με μάζα άστρου", visual: "neutronstar", callout: { value: "≈ 12–13 km", label: "ακτίνα, μέτρηση NICER" }, refs: ["R3", "R6"],
+        narration: "Το αποτέλεσμα είναι ένα σώμα με μάζα συνήθως γύρω στις μιάμιση ηλιακές μάζες, αλλά με ακτίνα μόλις δώδεκα με δεκατρία χιλιόμετρα, όσο μια μεγάλη πόλη. Το 2019, το τηλεσκόπιο ακτίνων Χ NICER, στον Διεθνή Διαστημικό Σταθμό, μέτρησε την ακτίνα του πάλσαρ PSR J0030+0451, χαρτογραφώντας τα θερμά σημεία της επιφάνειάς του." },
+      { heading: "Κοσμικοί φάροι", visual: "pulsar", callout: { value: "716 Hz", label: "ο ταχύτερος γνωστός πάλσαρ" }, refs: ["R1", "R5"],
+        narration: "Πολλοί αστέρες νετρονίων περιστρέφονται με τρομακτική ταχύτητα και εκπέμπουν δέσμες ραδιοκυμάτων από τους μαγνητικούς τους πόλους. Όταν η δέσμη σαρώνει τη Γη, βλέπουμε έναν παλμό, σαν φάρο. Τον πρώτο πάλσαρ τον ανακάλυψε το 1967 η Τζόσλιν Μπελ Μπερνέλ. Ο ταχύτερος γνωστός περιστρέφεται επτακόσιες δεκαέξι φορές το δευτερόλεπτο." },
+      { heading: "Πόσο βαρύς μπορεί να γίνει;", visual: "blackhole", callout: { value: "2,08 ± 0,07 M☉", label: "PSR J0740+6620" }, refs: ["R4", "R6"],
+        narration: "Η ύλη των νετρονίων μπορεί να στηρίξει μόνο μέχρι ένα όριο μάζας. Ο βαρύτερος καλά μετρημένος αστέρας νετρονίων, ο PSR J0740+6620, έχει περίπου δύο ηλιακές μάζες. Πάνω από ένα όριο, που εκτιμάται λίγο πάνω από τις δύο ηλιακές μάζες, το άστρο καταρρέει σε μαύρη τρύπα. Η ακριβής τιμή εξαρτάται από τη φυσική της ύλης σε πυκνότητες που κανένα εργαστήριο δεν μπορεί να φτάσει." },
+      { heading: "Όταν συγκρούονται", visual: "waves", callout: { value: "GW170817", label: "17 Αυγούστου 2017" }, refs: ["R2"],
+        narration: "Στις δεκαεπτά Αυγούστου του 2017, οι ανιχνευτές LIGO και Virgo κατέγραψαν βαρυτικά κύματα από τη συγχώνευση δύο αστέρων νετρονίων. Περίπου δύο δευτερόλεπτα αργότερα, διαστημικά τηλεσκόπια είδαν μια έκλαμψη ακτίνων γάμμα. Μέσα στις επόμενες ώρες, τηλεσκόπια σε όλο τον κόσμο εντόπισαν μια κιλονόβα, όπου παράγονται στοιχεία βαρύτερα από τον σίδηρο." },
+      { heading: "Το ανοιχτό ερώτημα", visual: "neutronstar", callout: null, refs: ["R3", "R6"],
+        narration: "Τι ακριβώς υπάρχει στον πυρήνα ενός αστέρα νετρονίων; Ίσως μόνο νετρόνια, ίσως εξωτικά σωματίδια όπως υπερόνια, ή ακόμα και ελεύθερα κουάρκ. Κάθε νέα μέτρηση μάζας και ακτίνας, από το NICER μέχρι τα βαρυτικά κύματα, περιορίζει τις πιθανές απαντήσεις." }
+    ],
+    references: [
+      { id: "R1", type: "peer", authors: "Hewish A., Bell S. J., Pilkington J. D. H., Scott P. F., Collins R. A.", year: 1968, title: "Observation of a Rapidly Pulsating Radio Source", venue: "Nature 217, 709", doi: "10.1038/217709a0", url: "" },
+      { id: "R2", type: "peer", authors: "Abbott B. P. et al. (LIGO Scientific & Virgo Collaborations)", year: 2017, title: "GW170817: Observation of Gravitational Waves from a Binary Neutron Star Inspiral", venue: "Physical Review Letters 119, 161101", doi: "10.1103/PhysRevLett.119.161101", url: "" },
+      { id: "R3", type: "peer", authors: "Riley T. E. et al.", year: 2019, title: "A NICER View of PSR J0030+0451: Millisecond Pulsar Parameter Estimation", venue: "The Astrophysical Journal Letters 887, L21", doi: "10.3847/2041-8213/ab481c", url: "" },
+      { id: "R4", type: "peer", authors: "Fonseca E. et al.", year: 2021, title: "Refined Mass and Geometric Measurements of the High-mass PSR J0740+6620", venue: "The Astrophysical Journal Letters 915, L12", doi: "10.3847/2041-8213/ac03b8", url: "" },
+      { id: "R5", type: "peer", authors: "Hessels J. W. T. et al.", year: 2006, title: "A Radio Pulsar Spinning at 716 Hz", venue: "Science 311, 1901", doi: "10.1126/science.1123430", url: "" },
+      { id: "R6", type: "review", authors: "Lattimer J. M., Prakash M.", year: 2004, title: "The Physics of Neutron Stars", venue: "Science 304, 536", doi: "10.1126/science.1090720", url: "" }
+    ]
+  },
+  corrections: [
+    "Η διατύπωση «σκέτα νετρόνια» άλλαξε σε «μόνο νετρόνια» και τα υπερόνια περιγράφονται ως «εξωτικά σωματίδια», για ακρίβεια.",
+    "Η μάζα του PSR J0740+6620 αναφέρεται ως «περίπου δύο ηλιακές μάζες» στην αφήγηση, ενώ η ακριβής τιμή (2,08 ± 0,07) εμφανίζεται στην οθόνη, όπως στο Fonseca et al. 2021."
+  ]
+};
+
+/* ------------------------------------------------------------------ helpers */
+const $ = (id) => document.getElementById(id);
+const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+const store = {
+  get(k, d) { try { const v = localStorage.getItem(k); return v ? JSON.parse(v) : d; } catch { return d; } },
+  set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} }
+};
+function rng(seed) { let a = seed >>> 0; return () => { a |= 0; a = (a + 0x6D2B79F5) | 0; let t = Math.imul(a ^ (a >>> 15), 1 | a); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; }; }
+const VISUALS = {
+  starfield: "βαθύ έναστρο πεδίο (γενική σκηνή)",
+  galaxy: "περιστρεφόμενος σπειροειδής γαλαξίας",
+  blackhole: "μαύρη τρύπα με δίσκο προσαύξησης και δακτύλιο φωτονίων",
+  star: "αστέρας με στέμμα (π.χ. Ήλιος, γέννηση/θάνατος άστρων)",
+  neutronstar: "αστέρας νετρονίων με μαγνητικές γραμμές πεδίου",
+  pulsar: "πάλσαρ με περιστρεφόμενες δέσμες και διάγραμμα παλμών",
+  planet: "πλανήτης σε τροχιά γύρω από άστρο",
+  transit: "διέλευση εξωπλανήτη μπροστά από άστρο με καμπύλη φωτός",
+  nebula: "νεφέλωμα / υπόλειμμα σουπερνόβα / περιοχή αστρογένεσης",
+  expansion: "διαστολή του Σύμπαντος: γαλαξίες που απομακρύνονται",
+  waves: "συγχώνευση δύο συμπαγών σωμάτων με βαρυτικά κύματα και σήμα chirp",
+  spectrum: "φάσμα με γραμμές απορρόφησης που μετατοπίζονται προς το ερυθρό",
+  solarsystem: "ηλιακό σύστημα με τροχιές πλανητών",
+  cosmicweb: "κοσμικός ιστός: νημάτια γαλαξιών και σκοτεινής ύλης"
+};
+
+/* ------------------------------------------------------------------ canvas renderers */
+const cv = $("cv");
+const ctx = cv.getContext("2d");
+let W = 1280, H = 720;
+const FONT = '"Commissioner", "Segoe UI", system-ui, sans-serif';
+const DISPLAY = '"GFS Didot", Georgia, serif';
+
+function makeStars(seed, n) {
+  const r = rng(seed); const out = [];
+  for (let i = 0; i < n; i++) out.push({ x: r(), y: r(), z: 0.2 + r() * 0.8, s: r() < 0.06 ? 1.8 : r() < 0.3 ? 1.1 : 0.6, tw: r() * 6.28, c: r() < 0.15 ? "#ffd6c9" : r() < 0.3 ? "#cfe1ff" : "#ffffff" });
+  return out;
+}
+const STARS = makeStars(7, 700);
+function drawStars(t, drift = 0.004) {
+  const g = ctx.createRadialGradient(W * 0.5, H * 0.5, 0, W * 0.5, H * 0.5, Math.max(W, H) * 0.75);
+  g.addColorStop(0, "#0d1330"); g.addColorStop(1, "#03040b");
+  ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+  for (const s of STARS) {
+    const x = ((s.x + t * drift * s.z) % 1) * W, y = s.y * H;
+    ctx.globalAlpha = 0.45 + 0.55 * Math.abs(Math.sin(t * 1.3 + s.tw)) * s.z;
+    ctx.fillStyle = s.c; ctx.fillRect(x, y, s.s, s.s);
+  }
+  ctx.globalAlpha = 1;
+}
+function glow(x, y, r, inner, outer) {
+  const g = ctx.createRadialGradient(x, y, 0, x, y, r);
+  g.addColorStop(0, inner); g.addColorStop(1, outer);
+  ctx.fillStyle = g; ctx.beginPath(); ctx.arc(x, y, r, 0, 6.2832); ctx.fill();
+}
+const M = () => Math.min(W, H);
+
+const cache = {};
+function galaxyParticles() {
+  if (cache.gal) return cache.gal;
+  const r = rng(11); const p = [];
+  for (let i = 0; i < 2200; i++) {
+    const arm = i % 2, d = Math.pow(r(), 0.7);
+    const a = arm * Math.PI + d * 4.2 + (r() - 0.5) * 0.55 * (1 - d * 0.5);
+    p.push({ d, a, c: d < 0.18 ? "#ffe2b0" : r() < 0.2 ? "#ff8fa3" : "#a9c8ff", s: d < 0.18 ? 1.6 : 1.1 });
+  }
+  return (cache.gal = p);
+}
+function nebulaCanvas() {
+  if (cache.neb) return cache.neb;
+  const c = document.createElement("canvas"); c.width = 640; c.height = 640;
+  const x = c.getContext("2d"); const r = rng(5);
+  const cols = ["rgba(255,107,129,", "rgba(95,214,200,", "rgba(242,180,92,", "rgba(140,110,255,"];
+  x.globalCompositeOperation = "lighter";
+  for (let i = 0; i < 70; i++) {
+    const cx = 320 + (r() - 0.5) * 420, cy = 320 + (r() - 0.5) * 420, rad = 40 + r() * 170;
+    const g = x.createRadialGradient(cx, cy, 0, cx, cy, rad);
+    const col = cols[Math.floor(r() * cols.length)];
+    g.addColorStop(0, col + (0.05 + r() * 0.1) + ")"); g.addColorStop(1, col + "0)");
+    x.fillStyle = g; x.fillRect(0, 0, 640, 640);
+  }
+  return (cache.neb = c);
+}
+function diskParticles() {
+  if (cache.disk) return cache.disk;
+  const r = rng(13); const p = [];
+  for (let i = 0; i < 2600; i++) p.push({ r: 1.55 + Math.pow(r(), 1.6) * 2.4, a: r() * 6.2832, h: (r() - 0.5) * 0.05 });
+  return (cache.disk = p);
+}
+function webPoints() {
+  if (cache.web) return cache.web;
+  const r = rng(21); const nodes = []; const pts = []; const links = [];
+  for (let i = 0; i < 26; i++) nodes.push({ x: r(), y: r() });
+  for (let i = 0; i < nodes.length; i++) {
+    const near = nodes.map((n, j) => ({ j, d: Math.hypot(n.x - nodes[i].x, n.y - nodes[i].y) })).sort((a, b) => a.d - b.d).slice(1, 3);
+    for (const { j } of near) links.push([i, j]);
+  }
+  for (const [i, j] of links) for (let k = 0; k < 60; k++) {
+    const f = r(); pts.push({ x: nodes[i].x + (nodes[j].x - nodes[i].x) * f + (r() - 0.5) * 0.02, y: nodes[i].y + (nodes[j].y - nodes[i].y) * f + (r() - 0.5) * 0.02 });
+  }
+  for (const n of nodes) for (let k = 0; k < 40; k++) pts.push({ x: n.x + (r() - 0.5) * 0.04, y: n.y + (r() - 0.5) * 0.04, hot: true });
+  return (cache.web = pts);
+}
+
+const RENDER = {
+  starfield(t) { drawStars(t, 0.01); },
+  galaxy(t) {
+    drawStars(t, 0.002);
+    const cx = W / 2, cy = H / 2, R = M() * 0.42;
+    ctx.save(); ctx.translate(cx, cy); ctx.scale(1, 0.55); ctx.rotate(-0.4);
+    ctx.globalCompositeOperation = "lighter";
+    for (const p of galaxyParticles()) {
+      const a = p.a + t * 0.25 / (0.25 + p.d);
+      ctx.fillStyle = p.c; ctx.globalAlpha = 0.75;
+      ctx.fillRect(Math.cos(a) * p.d * R, Math.sin(a) * p.d * R, p.s, p.s);
+    }
+    ctx.restore(); ctx.globalAlpha = 1; ctx.globalCompositeOperation = "source-over";
+    glow(cx, cy, M() * 0.12, "rgba(255,226,176,.85)", "rgba(255,226,176,0)");
+  },
+  blackhole(t) {
+    drawStars(t, 0.002);
+    const cx = W / 2, cy = H / 2, R = M() * 0.11;
+    const disk = (front) => {
+      for (const q of diskParticles()) {
+        const rr = R * q.r, a = q.a + t * 2.2 / Math.pow(q.r, 1.5);
+        const y = Math.sin(a) * rr * 0.2 + q.h * R;
+        if ((Math.sin(a) > 0) !== front) continue;
+        const dop = 0.5 - 0.5 * Math.cos(a);
+        ctx.fillStyle = `rgba(255,${150 + dop * 95 | 0},${70 + dop * 90 | 0},${(0.12 + dop * 0.5) * (1.6 / q.r)})`;
+        ctx.fillRect(cx + Math.cos(a) * rr, cy + y, 1.6, 1.6);
+      }
+    };
+    ctx.globalCompositeOperation = "lighter"; disk(false);
+    for (const [w, al] of [[R * 0.32, 0.08], [R * 0.16, 0.16], [R * 0.05, 0.4]]) {
+      ctx.strokeStyle = `rgba(255,200,140,${al})`; ctx.lineWidth = w;
+      ctx.beginPath(); ctx.ellipse(cx, cy, R * 1.55, R * 1.4, 0, Math.PI * 1.04, Math.PI * 1.96); ctx.stroke();
+    }
+    ctx.globalCompositeOperation = "source-over";
+    glow(cx, cy, R * 1.5, "rgba(255,200,140,.5)", "rgba(255,200,140,0)");
+    ctx.fillStyle = "#000"; ctx.beginPath(); ctx.arc(cx, cy, R, 0, 6.2832); ctx.fill();
+    ctx.strokeStyle = "rgba(255,230,190,.9)"; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(cx, cy, R * 1.04, 0, 6.2832); ctx.stroke();
+    ctx.globalCompositeOperation = "lighter"; disk(true); ctx.globalCompositeOperation = "source-over";
+  },
+  star(t) {
+    drawStars(t, 0.002);
+    const cx = W * 0.5, cy = H * 0.5, R = M() * 0.2;
+    glow(cx, cy, R * 2.6, "rgba(160,200,255,.35)", "rgba(160,200,255,0)");
+    glow(cx, cy, R * 1.5, "rgba(210,230,255,.55)", "rgba(210,230,255,0)");
+    const g = ctx.createRadialGradient(cx - R * 0.3, cy - R * 0.3, R * 0.1, cx, cy, R);
+    g.addColorStop(0, "#ffffff"); g.addColorStop(0.6, "#cfe0ff"); g.addColorStop(1, "#7fa6ff");
+    ctx.fillStyle = g; ctx.beginPath(); ctx.arc(cx, cy, R, 0, 6.2832); ctx.fill();
+    const r = rng(3); ctx.globalAlpha = 0.18;
+    for (let i = 0; i < 120; i++) {
+      const a = r() * 6.2832, d = Math.sqrt(r()) * R * 0.92;
+      ctx.fillStyle = r() < 0.5 ? "#ffffff" : "#9db8ff";
+      ctx.beginPath(); ctx.arc(cx + Math.cos(a + t * 0.05) * d, cy + Math.sin(a + t * 0.05) * d, 3 + r() * 9 * (0.6 + 0.4 * Math.sin(t * 2 + i)), 0, 6.2832); ctx.fill();
+    }
+    ctx.globalAlpha = 1;
+  },
+  neutronstar(t) {
+    drawStars(t, 0.002);
+    const cx = W / 2, cy = H / 2, R = M() * 0.1;
+    ctx.save(); ctx.translate(cx, cy); ctx.rotate(0.35);
+    ctx.strokeStyle = "rgba(95,214,200,.45)"; ctx.lineWidth = 1.5;
+    for (let k = 1; k <= 6; k++) {
+      const L = R * (1.4 + k * 0.75), ph = (t * 0.6 + k * 0.2) % 1;
+      for (const sgn of [1, -1]) {
+        ctx.beginPath();
+        for (let th = 0.05; th <= Math.PI - 0.05; th += 0.04) {
+          const rr = L * Math.sin(th) ** 2; ctx.lineTo(sgn * rr * Math.sin(th), -rr * Math.cos(th));
+        }
+        ctx.stroke();
+        const th = 0.15 + ph * (Math.PI - 0.3), rr = L * Math.sin(th) ** 2;
+        ctx.fillStyle = "rgba(95,214,200,.9)"; ctx.fillRect(sgn * rr * Math.sin(th) - 1.5, -rr * Math.cos(th) - 1.5, 3, 3);
+      }
+    }
+    ctx.restore();
+    glow(cx, cy, R * 2.4, "rgba(190,215,255,.45)", "rgba(190,215,255,0)");
+    const g = ctx.createRadialGradient(cx - R * 0.35, cy - R * 0.35, R * 0.1, cx, cy, R);
+    g.addColorStop(0, "#ffffff"); g.addColorStop(1, "#8fb0ff");
+    ctx.fillStyle = g; ctx.beginPath(); ctx.arc(cx, cy, R, 0, 6.2832); ctx.fill();
+    const hs = Math.sin(t * 3) * R * 0.5;
+    glow(cx + hs, cy - R * 0.55, R * 0.35, "rgba(255,240,200,.95)", "rgba(255,240,200,0)");
+  },
+  pulsar(t) {
+    drawStars(t, 0.002);
+    const cx = W / 2, cy = H * 0.42, R = M() * 0.05, P = 1.6, a = (t / P) * 6.2832;
+    ctx.save(); ctx.translate(cx, cy); ctx.rotate(a);
+    ctx.globalCompositeOperation = "lighter";
+    for (const s of [1, -1]) {
+      const g = ctx.createLinearGradient(0, 0, 0, -s * M() * 0.6);
+      g.addColorStop(0, "rgba(160,200,255,.7)"); g.addColorStop(1, "rgba(160,200,255,0)");
+      ctx.fillStyle = g; ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(-M() * 0.06, -s * M() * 0.6); ctx.lineTo(M() * 0.06, -s * M() * 0.6); ctx.closePath(); ctx.fill();
+    }
+    ctx.restore(); ctx.globalCompositeOperation = "source-over";
+    glow(cx, cy, R * 3, "rgba(200,220,255,.6)", "rgba(200,220,255,0)");
+    ctx.fillStyle = "#eef3ff"; ctx.beginPath(); ctx.arc(cx, cy, R, 0, 6.2832); ctx.fill();
+    // pulse train
+    const x0 = W * 0.12, x1 = W * 0.88, y0 = H * 0.82, amp = H * 0.08;
+    ctx.strokeStyle = "rgba(231,234,246,.25)"; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(x0, y0); ctx.lineTo(x1, y0); ctx.stroke();
+    ctx.strokeStyle = "#5fd6c8"; ctx.lineWidth = 2; ctx.beginPath();
+    for (let x = x0; x <= x1; x += 2) {
+      const tt = t - (x1 - x) / (x1 - x0) * 4 * P, ph = ((tt / P) % 0.5 + 0.5) % 0.5;
+      const y = y0 - amp * Math.exp(-Math.pow((ph - 0.25) / 0.012, 2));
+      x === x0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+    }
+    ctx.stroke();
+  },
+  planet(t) {
+    drawStars(t, 0.002);
+    const cx = W * 0.5, cy = H * 0.5, ax = M() * 0.42, by = M() * 0.15;
+    ctx.strokeStyle = "rgba(231,234,246,.25)"; ctx.lineWidth = 1; ctx.beginPath(); ctx.ellipse(cx, cy, ax, by, 0, 0, 6.2832); ctx.stroke();
+    const a = t * 0.35, px = cx + Math.cos(a) * ax, py = cy + Math.sin(a) * by, behind = Math.sin(a) < 0;
+    const drawPlanet = () => {
+      const pr = M() * 0.045 * (behind ? 0.85 : 1.15);
+      const g = ctx.createRadialGradient(px - (px - cx) * 0.02 - pr * 0.3 * Math.sign(px - cx || 1), py, pr * 0.1, px, py, pr);
+      g.addColorStop(0, "#9fd0ff"); g.addColorStop(1, "#1d3f7a");
+      ctx.fillStyle = g; ctx.beginPath(); ctx.arc(px, py, pr, 0, 6.2832); ctx.fill();
+    };
+    if (behind) drawPlanet();
+    glow(cx, cy, M() * 0.2, "rgba(255,214,150,.55)", "rgba(255,214,150,0)");
+    glow(cx, cy, M() * 0.07, "#fff6d8", "rgba(255,220,150,.9)");
+    if (!behind) drawPlanet();
+  },
+  transit(t) {
+    drawStars(t, 0.002);
+    const cx = W * 0.5, cy = H * 0.38, R = M() * 0.2, per = 10, ph = (t % per) / per;
+    glow(cx, cy, R * 1.5, "rgba(255,190,120,.35)", "rgba(255,190,120,0)");
+    const g = ctx.createRadialGradient(cx, cy, 0, cx, cy, R);
+    g.addColorStop(0, "#fff1cf"); g.addColorStop(0.8, "#ffbf6b"); g.addColorStop(1, "#d97a2b");
+    ctx.fillStyle = g; ctx.beginPath(); ctx.arc(cx, cy, R, 0, 6.2832); ctx.fill();
+    const px = cx - R * 1.6 + ph * R * 3.2, pr = R * 0.14;
+    ctx.fillStyle = "#05060c"; ctx.beginPath(); ctx.arc(px, cy + R * 0.2, pr, 0, 6.2832); ctx.fill();
+    const x0 = W * 0.15, x1 = W * 0.85, yb = H * 0.82, dip = H * 0.07;
+    const flux = (p) => { const x = cx - R * 1.6 + p * R * 3.2, d = Math.abs(x - cx); return d < R ? 1 - Math.min(1, (R + pr - d) / (2 * pr)) * 0.9 : 0; };
+    ctx.strokeStyle = "rgba(231,234,246,.2)"; ctx.beginPath(); ctx.moveTo(x0, yb - dip * 1.6); ctx.lineTo(x0, yb + 6); ctx.lineTo(x1, yb + 6); ctx.stroke();
+    ctx.strokeStyle = "#f2b45c"; ctx.lineWidth = 2; ctx.beginPath();
+    for (let i = 0; i <= 200; i++) { const p = i / 200; if (p > ph) break; const x = x0 + p * (x1 - x0), y = yb - dip * 1.4 + flux(p) * dip; i ? ctx.lineTo(x, y) : ctx.moveTo(x, y); }
+    ctx.stroke(); ctx.lineWidth = 1;
+    ctx.fillStyle = "rgba(231,234,246,.6)"; ctx.font = `${M() * 0.022}px ${FONT}`; ctx.fillText("φωτεινότητα", x0 + 6, yb - dip * 1.7);
+  },
+  nebula(t) {
+    drawStars(t, 0.002);
+    const c = nebulaCanvas(), s = Math.max(W, H) * (1.15 + 0.05 * Math.sin(t * 0.2));
+    ctx.save(); ctx.translate(W / 2, H / 2); ctx.rotate(t * 0.01);
+    ctx.globalCompositeOperation = "lighter"; ctx.drawImage(c, -s / 2, -s / 2, s, s);
+    ctx.restore(); ctx.globalCompositeOperation = "source-over";
+  },
+  expansion(t) {
+    ctx.fillStyle = "#04050d"; ctx.fillRect(0, 0, W, H);
+    const a = 0.55 + ((t * 0.06) % 1) * 0.9, r = rng(9);
+    for (let i = 0; i < 160; i++) {
+      const gx = (r() - 0.5) * 2, gy = (r() - 0.5) * 2, rot = r() * 3;
+      const x = W / 2 + gx * a * M() * 0.6, y = H / 2 + gy * a * M() * 0.6;
+      if (x < -20 || x > W + 20 || y < -20 || y > H + 20) continue;
+      ctx.save(); ctx.translate(x, y); ctx.rotate(rot);
+      ctx.fillStyle = `rgba(${200 + r() * 55 | 0},${180 + r() * 60 | 0},255,.8)`;
+      ctx.beginPath(); ctx.ellipse(0, 0, 5 + r() * 4, 2 + r() * 2, 0, 0, 6.2832); ctx.fill(); ctx.restore();
+    }
+    ctx.strokeStyle = "rgba(95,214,200,.25)"; ctx.lineWidth = 1;
+    for (let k = -4; k <= 4; k++) {
+      ctx.beginPath(); ctx.moveTo(W / 2 + k * a * M() * 0.15, 0); ctx.lineTo(W / 2 + k * a * M() * 0.15, H); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(0, H / 2 + k * a * M() * 0.15); ctx.lineTo(W, H / 2 + k * a * M() * 0.15); ctx.stroke();
+    }
+  },
+  waves(t) {
+    ctx.fillStyle = "#04050d"; ctx.fillRect(0, 0, W, H);
+    const T = 12, ph = (t % T) / T, cx = W / 2, cy = H * 0.42;
+    const sep = M() * 0.12 * Math.max(0.08, Math.pow(1 - ph, 0.25)), om = 2 / Math.pow(Math.max(0.02, 1 - ph), 0.375);
+    const ang = t * 0 + om * ph * T * 0.9;
+    ctx.strokeStyle = "rgba(95,214,200,.35)"; ctx.lineWidth = 1.5;
+    for (let k = 0; k < 9; k++) { const rr = ((t * 60 + k * 70) % 640); ctx.globalAlpha = 1 - rr / 640; ctx.beginPath(); ctx.ellipse(cx, cy, rr * (W / H > 1 ? 1.3 : 0.8), rr * 0.6, 0, 0, 6.2832); ctx.stroke(); }
+    ctx.globalAlpha = 1;
+    if (ph < 0.9) for (const s of [1, -1]) {
+      const x = cx + s * Math.cos(ang) * sep, y = cy + s * Math.sin(ang) * sep * 0.5;
+      glow(x, y, M() * 0.04, "rgba(220,235,255,.9)", "rgba(220,235,255,0)");
+    } else glow(cx, cy, M() * (0.05 + (ph - 0.9) * 2), "rgba(255,200,140,.9)", "rgba(255,120,80,0)");
+    const x0 = W * 0.1, x1 = W * 0.9, yb = H * 0.82, amp = H * 0.06;
+    ctx.strokeStyle = "#ff6b81"; ctx.lineWidth = 2; ctx.beginPath();
+    for (let i = 0; i <= 400; i++) {
+      const p = i / 400; if (p > ph) break;
+      const tau = Math.max(0.01, 1 - p), f = 6 / Math.pow(tau, 0.375), A = Math.min(1, 0.25 / Math.pow(tau, 0.25));
+      const y = p > 0.9 ? yb + amp * Math.sin(p * 400) * Math.exp(-(p - 0.9) * 60) * 0.8 : yb + amp * A * Math.sin(f * p * 30);
+      const x = x0 + p * (x1 - x0); i ? ctx.lineTo(x, y) : ctx.moveTo(x, y);
+    }
+    ctx.stroke(); ctx.lineWidth = 1;
+  },
+  spectrum(t) {
+    ctx.fillStyle = "#04050d"; ctx.fillRect(0, 0, W, H);
+    const x0 = W * 0.08, x1 = W * 0.92, y0 = H * 0.36, h = H * 0.16;
+    const g = ctx.createLinearGradient(x0, 0, x1, 0);
+    ["#6a2cff", "#2f6bff", "#22c8ff", "#3cff8a", "#f8ff3c", "#ffa22c", "#ff3c3c", "#7a0d0d"].forEach((c, i, a) => g.addColorStop(i / (a.length - 1), c));
+    ctx.fillStyle = g; ctx.fillRect(x0, y0, x1 - x0, h);
+    const z = 0.12 * (0.5 - 0.5 * Math.cos(t * 0.4));
+    const lines = [["Hβ", 486], ["Mg", 517], ["Na", 589], ["Hα", 656]];
+    const X = (nm) => x0 + (nm - 380) / (750 - 380) * (x1 - x0);
+    ctx.font = `${M() * 0.026}px ${FONT}`; ctx.textAlign = "center";
+    for (const [n, nm] of lines) {
+      const xr = X(nm), xs = X(nm * (1 + z));
+      ctx.strokeStyle = "rgba(231,234,246,.35)"; ctx.setLineDash([4, 4]); ctx.beginPath(); ctx.moveTo(xr, y0 + h + 8); ctx.lineTo(xr, y0 + h + 30); ctx.stroke(); ctx.setLineDash([]);
+      ctx.fillStyle = "#000"; if (xs < x1) ctx.fillRect(xs - 2, y0, 4, h);
+      ctx.fillStyle = "rgba(231,234,246,.8)"; if (xs < x1) ctx.fillText(n, xs, y0 - 10);
+    }
+    ctx.fillStyle = "rgba(231,234,246,.6)"; ctx.fillText("μήκος κύματος (nm) →", W / 2, y0 + h + 52);
+    ctx.font = `600 ${M() * 0.05}px "JetBrains Mono", monospace`; ctx.fillStyle = "#ff6b81";
+    ctx.fillText("z = " + z.toFixed(3).replace(".", ","), W / 2, H * 0.78); ctx.textAlign = "left";
+  },
+  solarsystem(t) {
+    drawStars(t, 0.001);
+    const cx = W / 2, cy = H / 2, S = M() * 0.46;
+    const pl = [[0.13, 4.15, 2, "#b9b2a8"], [0.2, 1.62, 3, "#e8c48f"], [0.28, 1, 3.4, "#6fb2ff"], [0.36, 0.53, 2.6, "#e07a50"], [0.55, 0.084, 7, "#e9c48a"], [0.7, 0.034, 6, "#efdba6"], [0.84, 0.012, 4.5, "#9fe3ec"], [0.97, 0.006, 4.4, "#5d82ff"]];
+    glow(cx, cy, S * 0.12, "#fff4cf", "rgba(255,200,100,0)");
+    for (const [d, w, s, c] of pl) {
+      ctx.strokeStyle = "rgba(231,234,246,.13)"; ctx.beginPath(); ctx.ellipse(cx, cy, d * S, d * S * 0.42, 0, 0, 6.2832); ctx.stroke();
+      const a = t * w * 0.6 + d * 20; ctx.fillStyle = c; ctx.beginPath(); ctx.arc(cx + Math.cos(a) * d * S, cy + Math.sin(a) * d * S * 0.42, s * M() / 720, 0, 6.2832); ctx.fill();
+    }
+  },
+  cosmicweb(t) {
+    ctx.fillStyle = "#03040a"; ctx.fillRect(0, 0, W, H);
+    const s = 1.1 + 0.08 * Math.sin(t * 0.15), ox = Math.sin(t * 0.05) * 0.03;
+    ctx.globalCompositeOperation = "lighter";
+    for (const p of webPoints()) {
+      const x = ((p.x - 0.5 + ox) * s + 0.5) * W, y = ((p.y - 0.5) * s + 0.5) * H;
+      ctx.fillStyle = p.hot ? "rgba(255,170,190,.55)" : "rgba(140,170,255,.45)";
+      ctx.fillRect(x, y, p.hot ? 2 : 1.4, p.hot ? 2 : 1.4);
+    }
+    ctx.globalCompositeOperation = "source-over";
+  }
+};
+
+/* ------------------------------------------------------------------ overlays */
+function wrapLines(text, maxW) {
+  const words = String(text).split(/\s+/); const lines = []; let line = "";
+  for (const w of words) { const t = line ? line + " " + w : w; if (ctx.measureText(t).width > maxW && line) { lines.push(line); line = w; } else line = t; }
+  if (line) lines.push(line); return lines;
+}
+function bottomShade() {
+  const g = ctx.createLinearGradient(0, H * 0.6, 0, H);
+  g.addColorStop(0, "rgba(0,0,0,0)"); g.addColorStop(1, "rgba(0,0,0,.75)");
+  ctx.fillStyle = g; ctx.fillRect(0, H * 0.6, W, H * 0.4);
+}
+function drawHeading(text) {
+  if (!text) return;
+  const fs = M() * 0.034; ctx.font = `600 ${fs}px ${FONT}`;
+  const pad = fs * 0.55, w = ctx.measureText(text).width;
+  ctx.fillStyle = "rgba(10,14,28,.72)"; ctx.fillRect(fs, fs, w + pad * 2 + 4, fs + pad * 1.4);
+  ctx.fillStyle = "#ff6b81"; ctx.fillRect(fs, fs, 4, fs + pad * 1.4);
+  ctx.fillStyle = "#e7eaf6"; ctx.textBaseline = "top"; ctx.fillText(text, fs + pad + 4, fs + pad * 0.75); ctx.textBaseline = "alphabetic";
+}
+function drawCallout(c, k) {
+  if (!c || !c.value) return;
+  const a = Math.min(1, Math.max(0, (k - 1.2) / 0.8)); if (!a) return;
+  const vert = H > W, fs = M() * (vert ? 0.075 : 0.065);
+  ctx.globalAlpha = a; ctx.textAlign = vert ? "center" : "right";
+  const x = vert ? W / 2 : W - M() * 0.06, y = vert ? H * 0.2 : H * 0.3;
+  ctx.font = `600 ${fs}px "JetBrains Mono", monospace`; ctx.fillStyle = "#f2b45c";
+  ctx.shadowColor = "rgba(0,0,0,.8)"; ctx.shadowBlur = 12;
+  ctx.fillText(c.value, x, y);
+  ctx.font = `${fs * 0.36}px ${FONT}`; ctx.fillStyle = "#e7eaf6"; ctx.fillText(c.label || "", x, y + fs * 0.6);
+  ctx.shadowBlur = 0; ctx.globalAlpha = 1; ctx.textAlign = "left";
+}
+function drawSubtitle(text) {
+  if (!text) return;
+  const vert = H > W, fs = M() * (vert ? 0.05 : 0.042);
+  ctx.font = `600 ${fs}px ${FONT}`; ctx.textAlign = "center";
+  const lines = wrapLines(text, W * 0.84).slice(0, 4);
+  let y = H - (vert ? H * 0.2 : M() * 0.1) - (lines.length - 1) * fs * 1.25;
+  ctx.lineWidth = fs * 0.16; ctx.strokeStyle = "rgba(0,0,0,.9)"; ctx.lineJoin = "round"; ctx.fillStyle = "#ffffff";
+  for (const l of lines) { ctx.strokeText(l, W / 2, y); ctx.fillText(l, W / 2, y); y += fs * 1.25; }
+  ctx.textAlign = "left"; ctx.lineWidth = 1;
+}
+function drawFooter(text) {
+  if (!text) return;
+  const fs = M() * 0.019; ctx.font = `${fs}px ${FONT}`; ctx.fillStyle = "rgba(231,234,246,.7)"; ctx.textAlign = "right";
+  const lines = wrapLines(text, W * (H > W ? 0.9 : 0.6)).slice(0, 2);
+  let y = H - fs * 0.9 - (lines.length - 1) * fs * 1.3;
+  for (const l of lines) { ctx.fillText(l, W - fs * 1.5, y); y += fs * 1.3; }
+  ctx.textAlign = "left";
+}
+function drawTitle(p, k) {
+  RENDER.nebula(k + 3);
+  ctx.fillStyle = "rgba(0,0,10,.35)"; ctx.fillRect(0, 0, W, H);
+  const a = Math.min(1, k / 0.8); ctx.globalAlpha = a; ctx.textAlign = "center";
+  const fs = M() * (H > W ? 0.09 : 0.1); ctx.font = `${fs}px ${DISPLAY}`; ctx.fillStyle = "#ffffff";
+  const tl = wrapLines(p.script.title, W * 0.86); let y = H / 2 - (tl.length - 1) * fs * 0.6;
+  for (const l of tl) { ctx.fillText(l, W / 2, y); y += fs * 1.1; }
+  ctx.fillStyle = "#ff6b81"; ctx.fillRect(W / 2 - M() * 0.08, y - fs * 0.55, M() * 0.16, 3);
+  ctx.font = `${fs * 0.36}px ${FONT}`; ctx.fillStyle = "#cfd5ee";
+  for (const l of wrapLines(p.script.subtitle || "", W * 0.8)) { ctx.fillText(l, W / 2, y + fs * 0.05); y += fs * 0.48; }
+  ctx.globalAlpha = 1; ctx.textAlign = "left";
+}
+function drawRefs(p, k) {
+  RENDER.starfield(k); ctx.fillStyle = "rgba(4,6,14,.78)"; ctx.fillRect(0, 0, W, H);
+  const m = M() * 0.06, fs = M() * 0.024;
+  ctx.font = `${M() * 0.05}px ${DISPLAY}`; ctx.fillStyle = "#fff"; ctx.fillText(p.lang === "en" ? "Sources" : "Πηγές", m, m + M() * 0.04);
+  let y = m + M() * 0.11; ctx.font = `${fs}px ${FONT}`;
+  for (const r of p.script.references || []) {
+    const lines = wrapLines(`${r.authors} (${r.year}). ${r.title}. ${r.venue}`, W - 2 * m).slice(0, 2);
+    if (y + lines.length * fs * 1.35 > H - M() * 0.14) break;
+    ctx.fillStyle = "#e7eaf6"; for (const l of lines) { ctx.fillText(l, m, y); y += fs * 1.35; } y += fs * 0.45;
+  }
+  ctx.font = `${fs * 0.85}px ${FONT}`; ctx.fillStyle = "#9aa3c7";
+  const note = p.lang === "en"
+    ? "Script by Claude from its own answer, checked for accuracy. References come from Claude's knowledge: verify via the DOI links."
+    : "Σενάριο από την απάντηση του Claude, με έλεγχο ακρίβειας. Οι πηγές προέρχονται από τη γνώση του Claude: επαλήθευσέ τες από τα links DOI.";
+  y = H - m * 0.9 - fs * 1.2; for (const l of wrapLines(note, W - 2 * m).slice(0, 2)) { ctx.fillText(l, m, y); y += fs * 1.1; }
+}
+
+/* ------------------------------------------------------------------ project & player state */
+let project = null;
+let items = [];
+const P = { idx: 0, sentence: 0, playing: false, mode: "speak", sub: "", clockBase: 0, clockAt: 0, token: 0, recording: false };
+const now = () => performance.now() / 1000;
+const sceneTime = () => P.clockBase + (P.playing ? now() - P.clockAt : 0);
+
+function chunks(text) {
+  const sents = String(text).match(/[^.!;?…]+[.!;?…]*/g) || [text];
+  const out = [];
+  for (let s of sents) {
+    s = s.trim(); if (!s) continue;
+    if (s.length <= 120) { out.push(s); continue; }
+    let cur = "";
+    for (const part of s.split(/(?<=,)\s+/)) {
+      if (cur && (cur + " " + part).length > 120) { out.push(cur); cur = part; } else cur = cur ? cur + " " + part : part;
+    }
+    if (cur) out.push(cur);
+  }
+  return out;
+}
+function buildItems(p) {
+  const its = [{ type: "title", label: p.lang === "en" ? "Title" : "Τίτλος" }];
+  p.script.scenes.forEach((s, i) => its.push({ type: "scene", scene: s, n: i, label: s.heading || `Σκηνή ${i + 1}`, parts: chunks(s.narration) }));
+  its.push({ type: "refs", label: p.lang === "en" ? "Sources" : "Πηγές" });
+  return its;
+}
+const estimate = (text) => Math.max(1.4, text.length / 15 / parseFloat($("rate").value));
+function totalEstimate() {
+  return items.reduce((a, it) => a + (it.type === "title" ? 3.5 : it.type === "refs" ? 9 : it.parts.reduce((b, t) => b + estimate(t) + 0.2, 0.8)), 0);
+}
+
+function draw() {
+  const it = items[P.idx]; if (!it || !project) return;
+  // Σε παύση πριν ξεκινήσει η σκηνή δείχνουμε ολοκληρωμένο καρέ (τίτλο, αριθμό), όχι το κενό πρώτο καρέ.
+  const k = P.playing || P.recording ? sceneTime() : Math.max(sceneTime(), 2.4);
+  if (it.type === "title") drawTitle(project, k);
+  else if (it.type === "refs") drawRefs(project, k);
+  else {
+    const s = it.scene; (RENDER[s.visual] || RENDER.starfield)(k + it.n * 13);
+    bottomShade(); drawHeading(s.heading); drawCallout(s.callout, k);
+    const byId = Object.fromEntries((project.script.references || []).map((r) => [r.id, r]));
+    const refs = (s.refs || []).map((id) => byId[id]).filter(Boolean).slice(0, 2).map((r) => `${String(r.authors).trim().split(/[\s,]/)[0]}${/et al|,/.test(r.authors) ? " et al." : ""} (${r.year})`);
+    drawFooter(refs.length ? (project.lang === "en" ? "Sources: " : "Πηγές: ") + refs.join("; ") : "");
+    drawSubtitle(P.sub);
+  }
+}
+function loop() { draw(); requestAnimationFrame(loop); }
+
+const sleep = (ms, token) => new Promise((res) => { const t0 = performance.now(); const tick = () => { if (token !== P.token || performance.now() - t0 >= ms) res(); else setTimeout(tick, 50); }; tick(); });
+function say(text, token) {
+  if (P.mode !== "speak") return sleep(estimate(text) * 1000, token);
+  return new Promise((res) => {
+    let done = false; const fin = () => { if (!done) { done = true; clearInterval(watch); res(); } };
+    const u = new SpeechSynthesisUtterance(text);
+    const v = currentVoice(); if (v) { u.voice = v; u.lang = v.lang; } else u.lang = project.lang === "en" ? "en-US" : "el-GR";
+    u.rate = parseFloat($("rate").value); u.onend = fin; u.onerror = fin;
+    const limit = performance.now() + (estimate(text) * 2.2 + 4) * 1000;
+    const watch = setInterval(() => { if (token !== P.token || performance.now() > limit) { fin(); } }, 200);
+    speechSynthesis.speak(u);
+  });
+}
+function setItem(i) {
+  P.idx = i; P.clockBase = 0; P.clockAt = now(); P.sub = "";
+  renderChips(); updateProgress();
+}
+async function run(fromIdx, fromPart) {
+  const token = ++P.token;
+  P.playing = true; P.clockAt = now(); setPlayUI();
+  for (let i = fromIdx; i < items.length; i++) {
+    if (i !== fromIdx || fromPart === 0) setItem(i);
+    const it = items[i];
+    if (it.type === "title") await sleep(3500, token);
+    else if (it.type === "refs") await sleep(9000, token);
+    else {
+      if (fromPart === 0) await sleep(400, token);
+      for (let j = i === fromIdx ? fromPart : 0; j < it.parts.length; j++) {
+        if (token !== P.token) return;
+        P.sentence = j; P.sub = it.parts[j]; updateProgress();
+        await say(it.parts[j], token);
+        if (token !== P.token) return;
+        await sleep(180, token);
+      }
+      P.sub = ""; await sleep(500, token);
+    }
+    if (token !== P.token) return;
+    fromPart = 0;
+  }
+  P.playing = false; P.sentence = 0; setPlayUI();
+  if (P.recording) stopRecording();
+}
+function pause() {
+  if (!P.playing) return;
+  P.token++; P.clockBase = sceneTime(); P.playing = false;
+  try { speechSynthesis.cancel(); } catch {}
+  setPlayUI();
+}
+function play() {
+  if (!project) return;
+  if (P.idx >= items.length - 1 && !P.playing && P.sentence === 0 && P.idx !== 0 && items[P.idx].type === "refs") setItem(0);
+  P.mode = hasSpeech() ? "speak" : "silent";
+  run(P.idx, P.sentence);
+}
+function jump(i) {
+  const was = P.playing; pause(); P.sentence = 0; setItem(Math.max(0, Math.min(items.length - 1, i)));
+  if (was) run(P.idx, 0); else { P.clockAt = now(); }
+}
+function setPlayUI() {
+  $("play").textContent = P.playing ? "⏸ Παύση" : "▶ Αναπαραγωγή";
+  $("bigplay").hidden = P.playing || P.recording;
+  for (const id of ["play", "prev", "next", "record", "go"]) $(id).disabled = P.recording;
+}
+function updateProgress() {
+  let done = 0;
+  for (let i = 0; i < P.idx; i++) { const it = items[i]; done += it.type === "title" ? 3.5 : it.type === "refs" ? 9 : it.parts.reduce((b, t) => b + estimate(t) + 0.2, 0.8); }
+  const it = items[P.idx]; if (it && it.type === "scene") done += it.parts.slice(0, P.sentence).reduce((b, t) => b + estimate(t) + 0.2, 0);
+  const tot = totalEstimate() || 1;
+  $("bar").style.width = (100 * done / tot).toFixed(1) + "%";
+  const f = (s) => `${Math.floor(s / 60)}:${String(Math.round(s % 60)).padStart(2, "0")}`;
+  $("time").textContent = `${f(done)} / ~${f(tot)}`;
+}
+function renderChips() {
+  const c = $("chips"); c.textContent = "";
+  items.forEach((it, i) => {
+    const b = document.createElement("button"); b.className = "chip" + (i === P.idx ? " on" : ""); b.textContent = it.label; b.title = it.label;
+    b.onclick = () => jump(i); c.append(b);
+  });
+  const on = c.querySelector(".on"); if (on) on.scrollIntoView({ block: "nearest", inline: "nearest" });
+}
+
+/* ------------------------------------------------------------------ voices */
+const hasSpeech = () => "speechSynthesis" in window && !!currentVoice();
+let voices = [];
+function currentVoice() { return voices.find((v) => v.voiceURI === $("voice").value) || null; }
+function loadVoices() {
+  if (!("speechSynthesis" in window)) { $("voiceNote").textContent = "Ο browser δεν υποστηρίζει σύνθεση φωνής· το βίντεο θα παίξει με υπότιτλους."; $("voiceNote").className = "note warn"; return; }
+  voices = speechSynthesis.getVoices();
+  const lang = project?.lang || "el", sel = $("voice"), prev = store.get("astrovid.voice." + lang, "");
+  const match = voices.filter((v) => v.lang.toLowerCase().startsWith(lang));
+  const multi = lang === "el" ? voices.filter((v) => /multilingual/i.test(v.name) && !match.includes(v)) : [];
+  sel.textContent = "";
+  const add = (list, label) => {
+    if (!list.length) return; const g = document.createElement("optgroup"); g.label = label;
+    for (const v of list) { const o = document.createElement("option"); o.value = v.voiceURI; o.textContent = `${v.name} (${v.lang})`; g.append(o); }
+    sel.append(g);
+  };
+  const score = (v) => (/natural|neural|online|premium|enhanced/i.test(v.name) ? 0 : 1);
+  add([...match].sort((a, b) => score(a) - score(b)), lang === "el" ? "Ελληνικές φωνές" : "English voices");
+  add(multi, "Πολυγλωσσικές (αγγλική προφορά)");
+  if (!match.length && !multi.length) {
+    $("voiceNote").textContent = lang === "el"
+      ? "Η συσκευή σου δεν έχει ελληνική φωνή, οπότε το βίντεο θα παίξει μόνο με υπότιτλους. Ελληνικές φωνές έχουν συνήθως τα Windows (Microsoft Edge), το Android και το iOS."
+      : "No English voice on this device; the video will play with subtitles only.";
+    $("voiceNote").className = "note warn";
+  } else { $("voiceNote").textContent = "Οι φωνές είναι αυτές της συσκευής σου. Στον Microsoft Edge οι «Natural» φωνές ακούγονται πιο φυσικές."; $("voiceNote").className = "note"; }
+  if ([...sel.options].some((o) => o.value === prev)) sel.value = prev;
+}
+if ("speechSynthesis" in window) speechSynthesis.addEventListener("voiceschanged", loadVoices);
+
+/* ------------------------------------------------------------------ project display */
+function setAspect() {
+  const v = $("aspect").value === "v"; W = v ? 720 : 1280; H = v ? 1280 : 720;
+  cv.width = W; cv.height = H; $("stage").classList.toggle("vertical", v);
+}
+function kindLabel(t) { return { peer: "Peer-reviewed", review: "Ανασκόπηση", book: "Βιβλίο", agency: "NASA / ESA / ESO", magazine: "Περιοδικό εκλαΐκευσης" }[t] || t; }
+function renderPanes(p) {
+  $("pAnswer").innerHTML = `<h3>Η ερώτηση</h3><p class="answer">${esc(p.question)}</p><h3>Η απάντηση του Claude</h3><p class="note">Αυτή η απάντηση είναι η βάση του βίντεο: το σενάριο ακολουθεί την εξήγηση και τη σειρά της, με τις διορθώσεις του ελέγχου.</p><div class="answer">${esc(p.answer)}</div>`;
+  const byId = Object.fromEntries((p.script.references || []).map((r) => [r.id, r]));
+  $("pScript").innerHTML = `<h3>${esc(p.script.title)}</h3><p class="note">${esc(p.script.subtitle)}</p>` + p.script.scenes.map((s, i) =>
+    `<div class="scene"><b>${i + 1}. ${esc(s.heading)}</b>${esc(s.narration)}<div class="meta">Γραφικό: ${esc(VISUALS[s.visual] || s.visual)}${s.callout?.value ? ` · Στην οθόνη: ${esc(s.callout.value)} ${esc(s.callout.label)}` : ""} · Πηγές: ${(s.refs || []).map((id) => esc(byId[id] ? `${byId[id].authors.split(",")[0]} (${byId[id].year})` : id)).join("; ") || "—"}</div></div>`).join("");
+  $("pRefs").innerHTML = `<p class="disclaimer">Οι πηγές προέρχονται από τη γνώση του Claude, όχι από ζωντανή αναζήτηση, και ο έλεγχος αφαιρεί όσες δεν είναι σίγουρες. Πριν δημοσιεύσεις, άνοιξε το DOI ή την αναζήτηση στο NASA ADS για να επιβεβαιώσεις ότι κάθε πηγή υπάρχει και λέει αυτό που αναφέρει το βίντεο. Η έκδοση Python της εφαρμογής ψάχνει ζωντανά σε OpenAlex, arXiv και NASA ADS.</p>` +
+    (p.script.references || []).map((r) => {
+      const q = encodeURIComponent(r.title);
+      return `<div class="ref"><span class="kind ${esc(r.type)}">${esc(kindLabel(r.type))}</span><div><b>[${esc(r.id)}]</b> ${esc(r.authors)} (${esc(r.year)}). ${esc(r.title)}. <i>${esc(r.venue)}</i></div><div>${r.doi ? `<a href="https://doi.org/${esc(r.doi)}" target="_blank" rel="noopener">DOI ${esc(r.doi)}</a>` : ""}${r.url ? `<a href="${esc(r.url)}" target="_blank" rel="noopener">Σελίδα</a>` : ""}<a href="https://ui.adsabs.harvard.edu/search/q=${encodeURIComponent('title:"' + r.title + '"')}" target="_blank" rel="noopener">NASA ADS</a><a href="https://scholar.google.com/scholar?q=${q}" target="_blank" rel="noopener">Google Scholar</a></div></div>`;
+    }).join("");
+  $("pCheck").innerHTML = `<h3>Διορθώσεις του επιστημονικού ελέγχου</h3>` + ((p.corrections || []).length
+    ? "<ul>" + p.corrections.map((c) => `<li>${esc(c)}</li>`).join("") + "</ul>" : `<p class="note">Ο έλεγχος δεν βρήκε κάτι προς διόρθωση.</p>`);
+}
+function loadProject(p) {
+  pause(); project = p; items = buildItems(p); P.sentence = 0; setItem(0);
+  $("exampleBadge").hidden = !p.example;
+  loadVoices(); renderPanes(p); P.clockAt = now();
+  $("dlScript").hidden = !downloads; $("record").hidden = !downloads || !window.MediaRecorder;
+}
+
+/* ------------------------------------------------------------------ library */
+function library() { return store.get("astrovid.library", []); }
+function renderLibrary() {
+  const lib = library(); $("lib").hidden = !lib.length; const ul = $("libList"); ul.textContent = "";
+  for (const p of lib) {
+    const li = document.createElement("li"), b = document.createElement("button");
+    b.textContent = p.script.title + " · " + new Date(p.created).toLocaleDateString("el-GR");
+    b.onclick = () => loadProject(p); li.append(b); ul.append(li);
+  }
+  const li = document.createElement("li"), b = document.createElement("button");
+  b.textContent = "Παράδειγμα: Αστέρες νετρονίων"; b.onclick = () => loadProject(EXAMPLE); li.append(b); ul.append(li);
+}
+
+/* ------------------------------------------------------------------ Claude pipeline */
+let sample = null, downloads = null, ctl = null;
+const LANG = { el: "Modern Greek (natural spoken style, correct Greek scientific terminology)", en: "English" };
+const RULES = `Scientific integrity rules (non-negotiable):
+- Never invent numbers, dates, names, missions or results. If unsure, leave it out.
+- Give measured values with units and, when known, uncertainties; mention genuine tensions between measurements.
+- Clearly separate established consensus, active debate and speculation.
+- Avoid popular myths and wrong oversimplifications.
+- Your knowledge has a training cutoff: do not present anything as "the latest" unless you are sure, and never describe events you do not know.`;
+function stepState(i, s, sub) { const li = $("steps").children[i]; li.dataset.s = s; if (sub) li.querySelector("small").textContent = sub; }
+function errText(e) {
+  return {
+    not_granted: "Δεν δόθηκε άδεια χρήσης του Claude σε αυτή τη σελίδα.",
+    sampling_disabled: "Το Claude δεν είναι διαθέσιμο για αυτόν τον λογαριασμό.",
+    rate_limited: "Πολλά αιτήματα ή έφτασες το όριο χρήσης. Δοκίμασε ξανά σε λίγο.",
+    refused: "Το Claude δεν απάντησε σε αυτό το αίτημα. Δοκίμασε άλλη διατύπωση.",
+    invalid_json: "Το Claude δεν επέστρεψε έγκυρο σενάριο. Πάτησε ξανά «Δημιουργία βίντεο».",
+    session_expired: "Η σύνδεση έληξε. Συνδέσου ξανά στο claude.ai.",
+    prompt_too_large: "Το κείμενο είναι πολύ μεγάλο. Συντόμευσε την περιγραφή.",
+    upstream_error: "Προσωρινό πρόβλημα σύνδεσης. Δοκίμασε ξανά."
+  }[e?.code] || (e?.message ? "Σφάλμα: " + e.message : "Κάτι πήγε στραβά. Δοκίμασε ξανά.");
+}
+function validScript(s) {
+  if (!s || typeof s !== "object" || !Array.isArray(s.scenes) || !s.scenes.length) throw { code: "invalid_json" };
+  s.title = String(s.title || ""); s.subtitle = String(s.subtitle || "");
+  s.references = (Array.isArray(s.references) ? s.references : []).filter((r) => r && r.id && r.title).map((r) => ({
+    id: String(r.id), type: ["peer", "review", "book", "agency", "magazine"].includes(r.type) ? r.type : "peer",
+    authors: String(r.authors || ""), year: r.year ?? "", title: String(r.title), venue: String(r.venue || ""),
+    doi: String(r.doi || "").replace(/^https?:\/\/(dx\.)?doi\.org\//, ""), url: /^https:\/\//.test(r.url || "") ? r.url : ""
+  }));
+  s.scenes = s.scenes.filter((x) => x && x.narration).map((x) => ({
+    heading: String(x.heading || ""), narration: String(x.narration), visual: VISUALS[x.visual] ? x.visual : "starfield",
+    callout: x.callout && x.callout.value ? { value: String(x.callout.value), label: String(x.callout.label || "") } : null,
+    refs: Array.isArray(x.refs) ? x.refs.map(String) : []
+  }));
+  if (!s.scenes.length) throw { code: "invalid_json" };
+  return s;
+}
+const SHAPE = `{"title": string, "subtitle": string,
+ "scenes": [{"heading": string (max ~6 words), "narration": string, "visual": one of ${JSON.stringify(Object.keys(VISUALS))}, "callout": {"value": string, "label": string} | null, "refs": ["R1", ...]}],
+ "references": [{"id": "R1", "type": "peer"|"review"|"book"|"agency"|"magazine", "authors": string, "year": number, "title": string, "venue": string (journal + volume + page/article), "doi": string or "", "url": string or ""}]}`;
+
+async function generate(topic, desc, lang, minutes) {
+  const question = desc && desc !== topic ? `${topic}\n\n${desc}` : topic;
+  const words = Math.round(minutes * 135), scenes = Math.max(6, Math.min(14, Math.round(minutes * 2.6)));
+  const live = $("live"); live.hidden = false; live.textContent = "Σκέφτεται…";
+  ctl = new AbortController(); const signal = ctl.signal;
+
+  stepState(0, "run");
+  const { text: answer } = await sample(question, { modelTier: "complex", signal, cache: false, onText: ({ text }) => { live.textContent = text; live.scrollTop = live.scrollHeight; } });
+  stepState(0, "done");
+
+  stepState(1, "run"); live.textContent = "Γράφει το σενάριο…";
+  const today = new Date().toISOString().slice(0, 10);
+  const draft = validScript(await sample.json(
+`You are an award-winning science communicator writing narration for a short astrophysics explainer video (in the spirit of ESA/Hubble videos, PBS Space Time, Kurzgesagt): clear, vivid, accurate, never sensational.
+
+The viewer asked:
+"""${question}"""
+
+You already answered them like this (EXPERT ANSWER):
+"""${answer}"""
+
+The EXPERT ANSWER is the backbone of the video: follow its explanation, its structure and what it emphasises, turned into spoken narration. Only fix things in it that are wrong.
+
+Today's date: ${today}.
+Narration language: ${LANG[lang]}.
+Length: ${minutes} minutes ≈ ${words} words of narration in total (±10%), in about ${scenes} scenes.
+
+Script rules:
+- Scene 1 is a hook: a striking fact or question. The last scene sums up the key idea and an open question.
+- Say how we know things (which telescope, mission, experiment or method).
+- Narration is for the ear: short sentences, numbers written the way they are spoken, no lists, no parentheses, no citations read aloud, no markdown.
+- "heading", "title", "subtitle" and callout text are in the narration language.
+- "visual" is one of these animated graphics: ${Object.entries(VISUALS).map(([k, v]) => `${k} = ${v}`).join("; ")}. Pick the one that best fits each scene and vary them.
+- "callout" is an optional key number shown big on screen (e.g. {"value": "13,8 δισ. έτη", "label": "ηλικία του Σύμπαντος"}), with units and uncertainty where relevant, or null.
+
+References: list 4–10 real sources that support the script: landmark and recent papers in peer-reviewed journals (ApJ, ApJL, MNRAS, A&A, Nature, Science, PRL, Nature Astronomy), review articles (e.g. Annual Review of Astronomy and Astrophysics), standard textbooks, NASA/ESA/ESO pages, and reputable science magazines (New Scientist, Scientific American, Quanta Magazine, Sky & Telescope, Physics World). Only list a source if you are highly confident it exists exactly as cited (authors, year, title, venue). Give a DOI only if you are certain of it. Fewer correct references are far better than one invented reference. Each scene's "refs" lists the ids supporting it.
+
+${RULES}
+
+Reply with only one JSON object of this shape:
+${SHAPE}`, { modelTier: "complex", signal, onText: ({ text }) => { live.textContent = "Γράφει το σενάριο… " + text.length + " χαρακτήρες"; } }));
+  stepState(1, "done", `${draft.scenes.length} σκηνές, ${draft.references.length} πηγές`);
+
+  stepState(2, "run"); live.textContent = "Ελέγχει κάθε πρόταση…";
+  const reviewed = await sample.json(
+`You are a strict scientific fact-checker and editor for an astrophysics video channel. Catch every error before publication.
+
+Viewer's question:
+"""${question}"""
+
+DRAFT SCRIPT (JSON):
+${JSON.stringify(draft)}
+
+Check every sentence of the narration, every callout and every reference:
+- Fix any claim that is wrong, outdated, overstated or uncertain; remove it if it cannot be stated reliably.
+- Fix scientific misconceptions and imprecise terminology.
+- References: remove any reference you are not highly confident exists exactly as cited, fix wrong details, remove DOIs you are not certain of, and make each scene's "refs" point only to references that really support it.
+- Fix language problems; the narration must be fluent ${LANG[lang]}.
+- Keep the length, structure, visuals and style otherwise unchanged.
+
+${RULES}
+
+Reply with only one JSON object: {"corrections": [string, ...] (what you changed and why, in ${lang === "el" ? "Greek" : "English"}; empty if nothing), "script": <the corrected script, same shape as the draft>}`,
+    { modelTier: "complex", signal, onText: () => { live.textContent = "Ελέγχει κάθε πρόταση…"; } });
+  const script = validScript(reviewed?.script);
+  const corrections = Array.isArray(reviewed?.corrections) ? reviewed.corrections.map(String) : [];
+  stepState(2, "done", corrections.length ? `${corrections.length} διορθώσεις` : "χωρίς διορθώσεις");
+  live.hidden = true;
+  return { example: false, topic, question, lang, answer, script, corrections, created: Date.now() };
+}
+
+$("form").addEventListener("submit", async (ev) => {
+  ev.preventDefault();
+  if (!sample) return;
+  const topic = $("topic").value.trim(), desc = $("desc").value.trim();
+  if (!topic) { $("topic").focus(); return; }
+  for (let i = 0; i < 3; i++) stepState(i, "idle", ["η βάση του βίντεο", "με βάση την απάντηση", "διόρθωση λαθών και πηγών"][i]);
+  $("err").hidden = true; $("go").disabled = true; $("stop").hidden = false;
+  store.set("astrovid.draft", { topic, desc, lang: $("lang").value, minutes: $("minutes").value });
+  try {
+    const p = await generate(topic, desc, $("lang").value, parseFloat($("minutes").value));
+    const lib = library(); lib.unshift(p); store.set("astrovid.library", lib.slice(0, 12)); renderLibrary();
+    loadProject(p); selectTab("tAnswer");
+    $("stage").scrollIntoView({ behavior: "smooth", block: "start" });
+  } catch (e) {
+    const i = [...$("steps").children].findIndex((li) => li.dataset.s === "run"); if (i >= 0) stepState(i, "err");
+    if (e?.code !== "cancelled") { $("err").textContent = errText(e); $("err").hidden = false; }
+    if (["not_granted", "sampling_disabled", "not_declared", "capability_disabled", "capability_removed"].includes(e?.code)) { $("go").hidden = true; $("sampleNote").hidden = false; }
+    $("live").hidden = true;
+  } finally { $("go").disabled = false; $("stop").hidden = true; }
+});
+$("stop").onclick = () => ctl?.abort();
+
+/* ------------------------------------------------------------------ downloads */
+function markdown(p) {
+  const byId = Object.fromEntries(p.script.references.map((r) => [r.id, r]));
+  let md = `# ${p.script.title}\n\n*${p.script.subtitle}*\n\n## Ερώτηση\n\n${p.question}\n\n## Απάντηση του Claude (βάση του βίντεο)\n\n${p.answer}\n\n## Σενάριο\n\n`;
+  p.script.scenes.forEach((s, i) => { md += `### ${i + 1}. ${s.heading}\n\n${s.narration}\n\n_Γραφικό: ${s.visual}${s.callout ? ` · ${s.callout.value} ${s.callout.label}` : ""} · Πηγές: ${s.refs.map((id) => byId[id] ? `[${id}]` : id).join(", ") || "—"}_\n\n`; });
+  md += `## Πηγές\n\n> Από τη γνώση του Claude· επαλήθευσέ τες πριν τη δημοσίευση.\n\n` + p.script.references.map((r) => `- **[${r.id}]** ${r.authors} (${r.year}). ${r.title}. *${r.venue}*.${r.doi ? ` https://doi.org/${r.doi}` : ""}${r.url ? ` ${r.url}` : ""} — ${kindLabel(r.type)}`).join("\n");
+  if (p.corrections.length) md += `\n\n## Διορθώσεις ελέγχου\n\n` + p.corrections.map((c) => `- ${c}`).join("\n");
+  return md + "\n";
+}
+const slug = (s) => (String(s).normalize("NFKD").replace(/[̀-ͯ]/g, "").replace(/[^\p{L}\p{N}]+/gu, "-").replace(/^-|-$/g, "").toLowerCase() || "astrovid").slice(0, 50);
+$("dlScript").onclick = async () => {
+  try { await downloads.save({ filename: slug(project.script.title) + ".md", data: markdown(project) }); $("dlNote").textContent = ""; }
+  catch (e) { if (e?.code !== "declined") $("dlNote").textContent = "Η λήψη δεν είναι διαθέσιμη εδώ."; }
+};
+let recorder = null, recChunks = [];
+$("record").onclick = () => {
+  if (!project || !window.MediaRecorder) return;
+  pause(); setItem(0); P.sentence = 0;
+  const type = ["video/webm;codecs=vp9", "video/webm;codecs=vp8", "video/webm"].find((t) => MediaRecorder.isTypeSupported(t));
+  try { recorder = new MediaRecorder(cv.captureStream(30), type ? { mimeType: type, videoBitsPerSecond: 6e6 } : undefined); }
+  catch { $("dlNote").textContent = "Ο browser δεν μπορεί να γράψει βίντεο."; return; }
+  recChunks = []; recorder.ondataavailable = (e) => e.data.size && recChunks.push(e.data);
+  recorder.onstop = async () => {
+    P.recording = false; setPlayUI(); $("dlNote").textContent = "";
+    const blob = new Blob(recChunks, { type: "video/webm" });
+    try { await downloads.save({ filename: slug(project.script.title) + ".webm", data: blob }); }
+    catch (e) { if (e?.code !== "declined") $("dlNote").textContent = "Η λήψη δεν ολοκληρώθηκε."; }
+  };
+  P.recording = true; P.mode = "silent"; setPlayUI();
+  $("dlNote").textContent = `Εγγραφή σε πραγματικό χρόνο (~${Math.round(totalEstimate() / 60)}′). Μην κλείσεις τη σελίδα.`;
+  recorder.start(1000); run(0, 0);
+};
+function stopRecording() { try { recorder?.state === "recording" && recorder.stop(); } catch {} }
+
+/* ------------------------------------------------------------------ wiring */
+$("play").onclick = () => (P.playing ? pause() : play());
+$("bigplay").onclick = play;
+$("prev").onclick = () => jump(P.idx - 1);
+$("next").onclick = () => jump(P.idx + 1);
+$("fs").onclick = () => { const el = $("stage"); (document.fullscreenElement ? document.exitFullscreen() : el.requestFullscreen?.())?.catch?.(() => {}); };
+$("rate").oninput = () => { $("rateOut").textContent = parseFloat($("rate").value).toFixed(2).replace(".", ",") + "×"; updateProgress(); };
+$("minutes").oninput = () => { $("minOut").textContent = String($("minutes").value).replace(".", ",") + "′"; };
+$("voice").onchange = () => store.set("astrovid.voice." + (project?.lang || "el"), $("voice").value);
+$("aspect").onchange = () => { setAspect(); store.set("astrovid.aspect", $("aspect").value); };
+function selectTab(id) {
+  for (const t of document.querySelectorAll(".tab")) { const on = t.id === id; t.setAttribute("aria-selected", on); $(t.dataset.pane).hidden = !on; }
+}
+for (const t of document.querySelectorAll(".tab")) t.onclick = () => selectTab(t.id);
+document.addEventListener("keydown", (e) => { if (e.code === "Space" && e.target === document.body) { e.preventDefault(); P.playing ? pause() : play(); } });
+
+(function init() {
+  $("aspect").value = store.get("astrovid.aspect", "h"); setAspect();
+  const d = store.get("astrovid.draft", null);
+  if (d) { $("topic").value = d.topic || ""; $("desc").value = d.desc || ""; $("lang").value = d.lang || "el"; $("minutes").value = d.minutes || 3; $("minutes").oninput(); }
+  else { $("topic").value = "Η ένταση του Hubble"; $("desc").value = "Γιατί οι μετρήσεις του ρυθμού διαστολής του Σύμπαντος δεν συμφωνούν μεταξύ τους; Τι λένε τα νεότερα δεδομένα;"; }
+  loadProject(library()[0] || EXAMPLE); renderLibrary(); loop();
+  document.fonts?.load?.(`600 40px ${FONT}`); document.fonts?.load?.(`40px ${DISPLAY}`);
+  const claude = window.claude;
+  if (!claude?.use) { $("go").hidden = true; $("sampleNote").hidden = false; return; }
+  claude.use("sample").then((s) => { sample = s; if (!s) { $("go").hidden = true; $("sampleNote").hidden = false; } });
+  claude.use("downloads").then((d) => { downloads = d; if (project) { $("dlScript").hidden = !d; $("record").hidden = !d || !window.MediaRecorder; } });
+})();
+</script>
