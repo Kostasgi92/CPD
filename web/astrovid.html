@@ -141,6 +141,7 @@ code { font-family: var(--mono); font-size: 12px; }
         </label>
       </div>
       <p class="note" id="voiceNote"></p>
+      <div class="controls"><button class="btn" id="translate" type="button" hidden></button></div>
       <div class="controls">
         <button class="btn" id="dlScript" hidden>⬇ Σενάριο & πηγές (.md)</button>
         <button class="btn" id="record" hidden>⏺ Εγγραφή βίντεο WebM (χωρίς φωνή)</button>
@@ -781,28 +782,63 @@ function renderChips() {
 const hasSpeech = () => "speechSynthesis" in window && !!currentVoice();
 let voices = [];
 function currentVoice() { return voices.find((v) => v.voiceURI === $("voice").value) || null; }
+const voiceLang = (v) => (/multilingual/i.test(v.name) ? "multi" : v.lang.toLowerCase().slice(0, 2));
 function loadVoices() {
   if (!("speechSynthesis" in window)) { $("voiceNote").textContent = "Εδώ δεν υπάρχει φωνή ανάγνωσης, οπότε το βίντεο παίζει μόνο με υπότιτλους. Αυτό συμβαίνει συνήθως μέσα στην εφαρμογή Claude για Android. Για να ακούσεις τη φωνή, άνοιξε τη σελίδα στο claude.ai από τον Chrome, τον Edge ή το Safari."; $("voiceNote").className = "note warn"; return; }
   voices = speechSynthesis.getVoices();
   const lang = project?.lang || "el", sel = $("voice"), prev = store.get("astrovid.voice." + lang, "");
-  const match = voices.filter((v) => v.lang.toLowerCase().startsWith(lang));
-  const multi = lang === "el" ? voices.filter((v) => /multilingual/i.test(v.name) && !match.includes(v)) : [];
+  const score = (v) => (/natural|neural|online|premium|enhanced/i.test(v.name) ? 0 : 1);
+  const pick = (code) => voices.filter((v) => voiceLang(v) === code).sort((a, b) => score(a) - score(b) || a.lang.localeCompare(b.lang));
+  const el = pick("el"), en = pick("en"), multi = pick("multi");
   sel.textContent = "";
   const add = (list, label) => {
     if (!list.length) return; const g = document.createElement("optgroup"); g.label = label;
     for (const v of list) { const o = document.createElement("option"); o.value = v.voiceURI; o.textContent = `${v.name} (${v.lang})`; g.append(o); }
     sel.append(g);
   };
-  const score = (v) => (/natural|neural|online|premium|enhanced/i.test(v.name) ? 0 : 1);
-  add([...match].sort((a, b) => score(a) - score(b)), lang === "el" ? "Ελληνικές φωνές" : "English voices");
-  add(multi, "Πολυγλωσσικές (αγγλική προφορά)");
-  if (!match.length && !multi.length) {
-    $("voiceNote").textContent = lang === "el"
-      ? "Η συσκευή σου δεν έχει ελληνική φωνή, οπότε το βίντεο θα παίξει μόνο με υπότιτλους. Ελληνικές φωνές έχουν συνήθως τα Windows (Microsoft Edge), το Android και το iOS."
-      : "No English voice on this device; the video will play with subtitles only.";
-    $("voiceNote").className = "note warn";
-  } else { $("voiceNote").textContent = "Οι φωνές είναι αυτές της συσκευής σου. Στον Microsoft Edge οι «Natural» φωνές ακούγονται πιο φυσικές."; $("voiceNote").className = "note"; }
+  // Πρώτα οι φωνές της γλώσσας του βίντεο, μετά οι πολυγλωσσικές, μετά η άλλη γλώσσα.
+  if (lang === "el") { add(el, "Ελληνικές φωνές"); add(multi, "Πολυγλωσσικές"); add(en, "Αγγλικές φωνές"); }
+  else { add(en, "Αγγλικές φωνές"); add(multi, "Πολυγλωσσικές"); add(el, "Ελληνικές φωνές"); }
+  if (!sel.options.length) {
+    $("voiceNote").textContent = "Η συσκευή σου δεν έχει εγκατεστημένες ελληνικές ή αγγλικές φωνές, οπότε το βίντεο θα παίξει μόνο με υπότιτλους.";
+    $("voiceNote").className = "note warn"; $("translate").hidden = true; return;
+  }
   if ([...sel.options].some((o) => o.value === prev)) sel.value = prev;
+  else if ((lang === "el" ? el : en).length) sel.value = (lang === "el" ? el : en)[0].voiceURI;
+  voiceHint();
+}
+function voiceHint() {
+  const v = currentVoice(), lang = project?.lang || "el", note = $("voiceNote"), btn = $("translate");
+  const vl = v ? voiceLang(v) : null;
+  btn.hidden = true; note.className = "note";
+  if (v && vl !== "multi" && vl !== lang && (vl === "el" || vl === "en")) {
+    const target = vl === "en" ? "αγγλικά" : "ελληνικά";
+    note.textContent = `Το σενάριο είναι στα ${lang === "el" ? "ελληνικά" : "αγγλικά"}. Για σωστή αφήγηση με αυτή τη φωνή, μετέφρασε το βίντεο στα ${target}.`;
+    note.className = "note warn";
+    btn.textContent = `Μετάφραση βίντεο στα ${target}`; btn.dataset.target = vl; btn.hidden = !sample;
+  } else if (vl === "multi") note.textContent = "Οι πολυγλωσσικές φωνές διαβάζουν και ελληνικά και αγγλικά, με αγγλική προφορά.";
+  else note.textContent = "Οι φωνές είναι αυτές της συσκευής σου. Στον Microsoft Edge οι «Natural» φωνές ακούγονται πιο φυσικές.";
+}
+async function translateProject() {
+  const target = $("translate").dataset.target, btn = $("translate"), src = project;
+  if (!sample || !src || !target) return;
+  pause(); btn.disabled = true; const label = btn.textContent; btn.textContent = "Μεταφράζει…";
+  try {
+    const out = await sample.json(
+`Translate this astrophysics video script into ${LANG[target]}. Keep the meaning, the numbers, the scene structure, "visual", "refs" and "references" exactly as they are (references stay in their original form). Translate "title", "subtitle", "heading", "narration" and callout "label"; adapt callout "value" only for number formatting (decimal comma in Greek, decimal point in English). Narration must sound natural when spoken aloud, with numbers written the way they are spoken.
+
+SCRIPT (JSON):
+${JSON.stringify(src.script)}
+
+Reply with only the translated script as one JSON object of the same shape.`, { modelTier: "default" });
+    const script = validScript(out);
+    const p = { ...src, example: false, lang: target, script, corrections: src.corrections, translatedFrom: src.lang, created: Date.now() };
+    store.set("astrovid.voice." + target, $("voice").value);
+    const lib = library(); lib.unshift(p); store.set("astrovid.library", lib.slice(0, 12)); renderLibrary();
+    loadProject(p);
+  } catch (e) {
+    if (e?.code !== "cancelled") { $("voiceNote").textContent = errText(e); $("voiceNote").className = "note warn"; }
+  } finally { btn.disabled = false; if (btn.textContent === "Μεταφράζει…") btn.textContent = label; }
 }
 if ("speechSynthesis" in window) speechSynthesis.addEventListener("voiceschanged", loadVoices);
 
@@ -838,7 +874,7 @@ function renderLibrary() {
   const lib = library(); $("lib").hidden = !lib.length; const ul = $("libList"); ul.textContent = "";
   for (const p of lib) {
     const li = document.createElement("li"), b = document.createElement("button");
-    b.textContent = p.script.title + " · " + new Date(p.created).toLocaleDateString("el-GR");
+    b.textContent = p.script.title + (p.lang === "en" ? " · EN" : "") + " · " + new Date(p.created).toLocaleDateString("el-GR");
     b.onclick = () => loadProject(p); li.append(b); ul.append(li);
   }
   const li = document.createElement("li"), b = document.createElement("button");
@@ -1022,7 +1058,8 @@ $("next").onclick = () => jump(P.idx + 1);
 $("fs").onclick = () => { const el = $("stage"); (document.fullscreenElement ? document.exitFullscreen() : el.requestFullscreen?.())?.catch?.(() => {}); };
 $("rate").oninput = () => { $("rateOut").textContent = parseFloat($("rate").value).toFixed(2).replace(".", ",") + "×"; updateProgress(); };
 $("minutes").oninput = () => { $("minOut").textContent = String($("minutes").value).replace(".", ",") + "′"; };
-$("voice").onchange = () => store.set("astrovid.voice." + (project?.lang || "el"), $("voice").value);
+$("voice").onchange = () => { store.set("astrovid.voice." + (project?.lang || "el"), $("voice").value); voiceHint(); };
+$("translate").onclick = translateProject;
 $("aspect").onchange = () => { setAspect(); store.set("astrovid.aspect", $("aspect").value); };
 function selectTab(id) {
   for (const t of document.querySelectorAll(".tab")) { const on = t.id === id; t.setAttribute("aria-selected", on); $(t.dataset.pane).hidden = !on; }
@@ -1039,7 +1076,7 @@ document.addEventListener("keydown", (e) => { if (e.code === "Space" && e.target
   document.fonts?.load?.(`600 40px ${FONT}`); document.fonts?.load?.(`40px ${DISPLAY}`);
   const claude = window.claude;
   if (!claude?.use) { $("go").hidden = true; $("sampleNote").hidden = false; return; }
-  claude.use("sample").then((s) => { sample = s; if (!s) { $("go").hidden = true; $("sampleNote").hidden = false; } });
+  claude.use("sample").then((s) => { sample = s; if (!s) { $("go").hidden = true; $("sampleNote").hidden = false; } else if (voices.length) voiceHint(); });
   claude.use("downloads").then((d) => { downloads = d; if (project) { $("dlScript").hidden = !d; $("record").hidden = !d || !window.MediaRecorder; } });
 })();
 </script>
