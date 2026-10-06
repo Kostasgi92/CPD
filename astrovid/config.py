@@ -29,10 +29,21 @@ AUTHORITATIVE_DOMAINS = [
     "journals.aps.org",
     "arxiv.org",
     "adsabs.harvard.edu",
-    "newscientist.com",
 ]
 # Περιοδικά επιστημονικής δημοσιογραφίας: χρήσιμα για νέα και πλαίσιο, όχι peer-reviewed.
-MAGAZINE_DOMAINS = ["newscientist.com"]
+MAGAZINE_DOMAINS = [
+    "newscientist.com",
+    "scientificamerican.com",
+    "quantamagazine.org",
+    "skyandtelescope.org",
+    "astronomy.com",
+    "skyatnightmagazine.com",
+    "physicsworld.com",
+    "physicstoday.aip.org",
+    "physics.aps.org",
+    "sciencenews.org",
+]
+AUTHORITATIVE_DOMAINS += MAGAZINE_DOMAINS
 
 FONT_CANDIDATES = [
     os.environ.get("ASTROVID_FONT", ""),

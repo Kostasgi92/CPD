@@ -72,7 +72,10 @@ def test_web_citations_become_sources():
     assert [w.id for w in web] == ["W1"] and web[0].kind == "web"
 
 
-def test_new_scientist_is_marked_as_magazine():
-    cite = SimpleNamespace(url="https://www.newscientist.com/article/x", title="NS", cited_text="...")
-    _, web = _brief_with_web_tags([SimpleNamespace(type="text", text="a", citations=[cite])], start=1)
-    assert web[0].kind == "magazine" and web[0].short_ref() == "newscientist.com"
+def test_science_magazines_are_marked_as_magazine():
+    cites = [SimpleNamespace(url=u, title="t", cited_text="...") for u in
+             ("https://www.newscientist.com/article/x", "https://www.scientificamerican.com/article/y",
+              "https://www.esa.int/z")]
+    _, web = _brief_with_web_tags([SimpleNamespace(type="text", text="a", citations=cites)], start=1)
+    assert [w.kind for w in web] == ["magazine", "magazine", "web"]
+    assert web[1].short_ref() == "scientificamerican.com"

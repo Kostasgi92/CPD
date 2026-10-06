@@ -27,7 +27,8 @@ numbers, dates, names, missions or results. If a specific result is not in the s
 (e.g. H0 = 73.0 ± 1.0 km/s/Mpc). Prefer the most recent peer-reviewed value; mention tensions \
 between measurements when they exist instead of silently picking one.
 - Clearly distinguish established consensus, active debate, and speculation/hypotheses.
-- Science magazines such as New Scientist are good for context and news, but they are journalism, \
+- Science magazines (New Scientist, Scientific American, Quanta, Sky & Telescope, Astronomy, \
+Physics World, Physics Today, Science News, ...) are good for context and news, but they are journalism, \
 not peer-reviewed research: when they report a result, prefer the numbers from the original paper.
 - Results that only exist as arXiv preprints must be described as "not yet peer-reviewed" / \
 "recent preprint".
@@ -143,8 +144,9 @@ class Writer:
         tools = []
         if self.s.use_web_search:
             prompt += (
-                "\nUse web search (limited to space agencies, observatories, journal sites and New "
-                "Scientist) to "
+                "\nUse web search (limited to space agencies, observatories, journal sites and "
+                "reputable science magazines such as New Scientist, Scientific American, Quanta "
+                "Magazine, Sky & Telescope and Physics World) to "
                 "verify the latest values and to add any important result newer than these papers "
                 "(e.g. new JWST/Euclid/LIGO/EHT/DESI results). Facts from web pages are cited "
                 "automatically; do not add P-tags to them.\n"

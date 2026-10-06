@@ -231,7 +231,7 @@ def _write_markdown(folder: Path, topic: str, script: VideoScript, sources: list
     used = {s.id for s in _used_sources(script, by_id)}
     kinds = {"peer-reviewed": "Peer-reviewed", "review": "Άρθρο ανασκόπησης",
              "preprint": "Preprint (χωρίς κρίση)", "web": "Ιστότοπος οργανισμού/περιοδικού",
-             "magazine": "Επιστημονική δημοσιογραφία (π.χ. New Scientist)"}
+             "magazine": "Επιστημονικό περιοδικό (π.χ. New Scientist, Scientific American)"}
     bib = ["# Πηγές", "", "Με ★ οι πηγές που χρησιμοποιούνται στο βίντεο.", ""]
     for src in sources:
         star = "★ " if src.id in used else ""

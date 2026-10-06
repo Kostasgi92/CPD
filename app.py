@@ -13,7 +13,7 @@ st.set_page_config(page_title="AstroVid", page_icon="🔭", layout="centered")
 st.title("🔭 AstroVid")
 st.caption("Σύντομα ενημερωτικά βίντεο αστροφυσικής (2–5 λεπτά): το Claude απαντά στην ερώτησή σας "
            "και η απάντηση επαληθεύεται με peer-reviewed δημοσιεύσεις, ανασκοπήσεις, NASA/ESA/ESO "
-           "και New Scientist.")
+           "και επιστημονικά περιοδικά (New Scientist, Scientific American, Quanta κ.ά.).")
 
 if not (os.environ.get("ANTHROPIC_API_KEY") or os.environ.get("ANTHROPIC_AUTH_TOKEN")):
     st.warning("Δεν έχει οριστεί `ANTHROPIC_API_KEY`. Δείτε το README για τη ρύθμιση.")
