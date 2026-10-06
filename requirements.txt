@@ -1,0 +1,6 @@
+anthropic>=1.11
+edge-tts>=7.0
+pillow>=10.0
+pydantic>=2.7
+requests>=2.31
+streamlit>=1.40
