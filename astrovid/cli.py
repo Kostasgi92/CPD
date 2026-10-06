@@ -11,15 +11,24 @@ from .pipeline import SIZES, generate
 
 def main() -> None:
     p = argparse.ArgumentParser(prog="astrovid", description="Βίντεο αστροφυσικής 2–5 λεπτών από έγκριτες πηγές.")
-    p.add_argument("topic", help="Θέμα, π.χ. «Η ένταση του Hubble»")
+    p.add_argument("topic", nargs="?", help="Θέμα, π.χ. «Η ένταση του Hubble»")
     p.add_argument("-d", "--description", default="", help="Τι θέλετε να καλύπτει το βίντεο")
     p.add_argument("-m", "--minutes", type=float, default=3.0, help="Διάρκεια σε λεπτά (2–5)")
     p.add_argument("-l", "--language", default="el", choices=sorted(VOICES), help="Γλώσσα αφήγησης")
-    p.add_argument("--voice", help="Φωνή edge-tts (π.χ. el-GR-AthinaNeural)")
+    p.add_argument("--voice", help="Φωνή edge-tts (π.χ. el-GR-AthinaNeural, en-GB-RyanNeural)")
+    p.add_argument("--list-voices", action="store_true", help="Εμφάνιση των διαθέσιμων φωνών")
     p.add_argument("--aspect", default="16:9", choices=sorted(SIZES), help="Μορφή εικόνας")
     p.add_argument("--no-web", action="store_true", help="Χωρίς αναζήτηση σε ιστότοπους NASA/ESA/περιοδικών")
     p.add_argument("-o", "--output", help="Φάκελος εξόδου")
     args = p.parse_args()
+    if args.list_voices:
+        for lang, voices in VOICES.items():
+            print(f"[{lang}]")
+            for name, label in voices.items():
+                print(f"  {name:34} {label}")
+        return
+    if not args.topic:
+        p.error("δώστε ένα θέμα")
 
     logging.basicConfig(level=logging.WARNING, format="%(levelname)s %(name)s: %(message)s")
     settings = Settings()

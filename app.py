@@ -11,15 +11,16 @@ from astrovid.pipeline import generate
 
 st.set_page_config(page_title="AstroVid", page_icon="🔭", layout="centered")
 st.title("🔭 AstroVid")
-st.caption("Σύντομα ενημερωτικά βίντεο αστροφυσικής (2–5 λεπτά), βασισμένα σε peer-reviewed "
-           "δημοσιεύσεις, ανασκοπήσεις και επίσημα δεδομένα NASA/ESA/ESO.")
+st.caption("Σύντομα ενημερωτικά βίντεο αστροφυσικής (2–5 λεπτά): το Claude απαντά στην ερώτησή σας "
+           "και η απάντηση επαληθεύεται με peer-reviewed δημοσιεύσεις, ανασκοπήσεις, NASA/ESA/ESO "
+           "και New Scientist.")
 
 if not (os.environ.get("ANTHROPIC_API_KEY") or os.environ.get("ANTHROPIC_AUTH_TOKEN")):
     st.warning("Δεν έχει οριστεί `ANTHROPIC_API_KEY`. Δείτε το README για τη ρύθμιση.")
 
 c_lang, c_voice = st.columns(2)
 language = c_lang.selectbox("Γλώσσα αφήγησης", ["el", "en"], format_func={"el": "Ελληνικά", "en": "English"}.get)
-voice = c_voice.selectbox("Φωνή", VOICES[language])
+voice = c_voice.selectbox("Φωνή", list(VOICES[language]), format_func=VOICES[language].get)
 
 with st.form("video"):
     topic = st.text_input("Θέμα", placeholder="π.χ. Η ένταση του Hubble")
@@ -73,8 +74,12 @@ if result:
     st.download_button("⬇️ Λήψη MP4", result.video.read_bytes(), file_name=result.video.name,
                        mime="video/mp4")
 
-    tab_script, tab_sources, tab_check, tab_brief = st.tabs(
-        ["Σενάριο", "Πηγές", "Επιστημονικός έλεγχος", "Έρευνα"])
+    tab_answer, tab_script, tab_sources, tab_check, tab_brief = st.tabs(
+        ["Απάντηση Claude", "Σενάριο", "Πηγές", "Επιστημονικός έλεγχος", "Έρευνα"])
+    with tab_answer:
+        st.caption("Η απάντηση του Claude στην ερώτησή σας, πάνω στην οποία χτίστηκε το βίντεο. "
+                   "Η επαλήθευσή της με τις πηγές είναι στην καρτέλα «Έρευνα».")
+        st.markdown(result.answer)
     by_id = {s.id: s for s in result.sources}
     with tab_script:
         for i, scene in enumerate(result.script.scenes, 1):
@@ -84,7 +89,8 @@ if result:
             st.caption("Πηγές: " + ("; ".join(refs) if refs else "—"))
     with tab_sources:
         labels = {"peer-reviewed": "📗 Peer-reviewed", "review": "📘 Ανασκόπηση",
-                  "preprint": "📙 Preprint", "web": "🌐 Οργανισμός/περιοδικό"}
+                  "preprint": "📙 Preprint", "web": "🌐 Οργανισμός/περιοδικό",
+                  "magazine": "📰 Επιστημονική δημοσιογραφία"}
         for s in result.sources:
             link = f"https://doi.org/{s.doi}" if s.doi else s.url
             st.markdown(f"**[{s.id}]** {labels.get(s.kind, s.kind)} — [{s.title}]({link})  \n"

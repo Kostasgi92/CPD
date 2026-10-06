@@ -39,12 +39,12 @@ class Source:
     doi: str = ""
     url: str = ""
     abstract: str = ""
-    kind: str = "peer-reviewed"  # peer-reviewed | review | preprint | web
+    kind: str = "peer-reviewed"  # peer-reviewed | review | preprint | web | magazine
     cited_by: int = 0
     origin: str = ""  # openalex | ads | arxiv | web
 
     def short_ref(self) -> str:
-        if self.kind == "web" and self.url:
+        if self.kind in ("web", "magazine") and self.url:
             return re.sub(r"^www\.", "", urlparse(self.url).netloc)
         if not self.authors:
             who = self.venue or "—"

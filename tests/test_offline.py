@@ -12,14 +12,17 @@ from astrovid.tts import SilentTTS, probe_duration
 
 
 class FakeWriter:
-    def plan(self, topic, description):
+    def answer(self, topic, description):
+        return "Οι αστέρες νετρονίων είναι τα πυκνότερα ορατά αντικείμενα."
+
+    def plan(self, topic, description, answer=""):
         return SearchPlan(queries=["neutron star equation of state"], working_title=topic)
 
-    def research_brief(self, topic, description, papers, progress=None):
+    def research_brief(self, topic, description, papers, answer="", progress=None):
         web = [Source(id="W1", title="NICER", url="https://www.nasa.gov/nicer", kind="web", origin="web")]
         return "1. Neutron stars have radii of about 12 km [P1].[W1]", web
 
-    def write_script(self, topic, description, brief, sources, minutes, language):
+    def write_script(self, topic, description, brief, sources, minutes, language, answer=""):
         text = ("Ένας αστέρας νετρονίων έχει διάμετρο περίπου είκοσι τεσσάρων χιλιομέτρων. "
                 "Κι όμως, η μάζα του ξεπερνά τη μάζα του Ήλιου. ") * 2
         return VideoScript(title="Αστέρες νετρονίων", subtitle="Η πιο πυκνή ύλη του Σύμπαντος",
@@ -51,6 +54,7 @@ def test_full_pipeline_offline(tmp_path, monkeypatch):
     assert (result.folder / "sources.md").read_text(encoding="utf-8").count("- ★") == 2
     assert "Riley & Watts (2019), ApJL" in (result.folder / "script.md").read_text(encoding="utf-8")
     assert any("Έτοιμο" in m for m in messages)
+    assert result.answer and (result.folder / "claude_answer.md").exists()
     assert result.video.name == "asteres-netronion.mp4"
 
 
@@ -66,3 +70,9 @@ def test_web_citations_become_sources():
     text, web = _brief_with_web_tags(blocks, start=1)
     assert text == "Euclid launched in 2023.[W1] Again.[W1]"
     assert [w.id for w in web] == ["W1"] and web[0].kind == "web"
+
+
+def test_new_scientist_is_marked_as_magazine():
+    cite = SimpleNamespace(url="https://www.newscientist.com/article/x", title="NS", cited_text="...")
+    _, web = _brief_with_web_tags([SimpleNamespace(type="text", text="a", citations=[cite])], start=1)
+    assert web[0].kind == "magazine" and web[0].short_ref() == "newscientist.com"

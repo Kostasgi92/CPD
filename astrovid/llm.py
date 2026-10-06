@@ -9,7 +9,7 @@ import logging
 import anthropic
 from pydantic import BaseModel, Field
 
-from .config import AUTHORITATIVE_DOMAINS, Settings
+from .config import AUTHORITATIVE_DOMAINS, MAGAZINE_DOMAINS, Settings
 from .research import Source
 
 log = logging.getLogger(__name__)
@@ -20,12 +20,15 @@ LANG_NAMES = {"el": "Greek (Modern Greek, natural spoken style)", "en": "English
 
 SCIENCE_RULES = """\
 Scientific integrity rules (non-negotiable):
-- Every factual claim must be supported by the supplied sources or the research brief. Never invent \
-numbers, dates, names, missions or results. If something is not in the sources, leave it out.
+- Every factual claim must be supported by the supplied sources or the research brief; only \
+well-established textbook physics may come from the expert answer without a source. Never invent \
+numbers, dates, names, missions or results. If a specific result is not in the sources, leave it out.
 - Quote measured values with units and, where the source gives them, uncertainties \
 (e.g. H0 = 73.0 ± 1.0 km/s/Mpc). Prefer the most recent peer-reviewed value; mention tensions \
 between measurements when they exist instead of silently picking one.
 - Clearly distinguish established consensus, active debate, and speculation/hypotheses.
+- Science magazines such as New Scientist are good for context and news, but they are journalism, \
+not peer-reviewed research: when they report a result, prefer the numbers from the original paper.
 - Results that only exist as arXiv preprints must be described as "not yet peer-reviewed" / \
 "recent preprint".
 - Avoid popular myths and oversimplifications that are wrong (e.g. "black holes suck everything \
@@ -87,29 +90,51 @@ class Writer:
             raise RuntimeError("Το μοντέλο δεν επέστρεψε έγκυρη δομημένη απάντηση.")
         return response.parsed_output
 
+    # 0. Η απάντηση του Claude, όπως αν του έκανες απλώς την ερώτηση -----------
+    def answer(self, topic: str, description: str) -> str:
+        """Η βάση του βίντεο: ό,τι θα απαντούσε το Claude σε μια απλή ερώτηση, χωρίς σενάριο ή κανόνες."""
+        question = topic if not description or description == topic else f"{topic}\n\n{description}"
+        with self.client.beta.messages.stream(
+            model=self.s.model,
+            max_tokens=64000,
+            thinking={"type": "adaptive"},
+            output_config={"effort": self.s.effort},
+            messages=[{"role": "user", "content": question}],
+            **self._extra(),
+        ) as stream:
+            response = stream.get_final_message()
+        _check_stop(response)
+        return "".join(b.text for b in response.content if b.type == "text").strip()
+
     # 1. Σχεδιασμός αναζήτησης ------------------------------------------------
-    def plan(self, topic: str, description: str) -> SearchPlan:
+    def plan(self, topic: str, description: str, answer: str = "") -> SearchPlan:
+        context = f"\n\nAn expert answer to the viewer's question, whose claims must be checked:\n{answer}" if answer else ""
         return self._parse(
             SearchPlan,
             "You are an astrophysics librarian who designs literature searches.",
-            f"Topic: {topic}\nViewer's description of what they want: {description}\n\n"
+            f"Topic: {topic}\nViewer's description of what they want: {description}{context}\n\n"
             "Write 3-5 short English search queries (3-6 words each, technical astrophysics "
             "vocabulary, no boolean operators) that will find the key peer-reviewed papers, review "
             "articles and newest results for this topic in OpenAlex, NASA ADS and arXiv. Cover "
-            "different angles (fundamentals, latest observations, open questions).",
+            "different angles (fundamentals, latest observations, open questions) and the main "
+            "factual claims of the expert answer, so they can be verified.",
             effort="low",
         )
 
     # 2. Σύνθεση έρευνας (με αναζήτηση μόνο σε έγκυρους ιστότοπους) -----------
     def research_brief(self, topic: str, description: str, papers: list[Source],
-                       progress=lambda msg: None) -> tuple[str, list[Source]]:
+                       answer: str = "", progress=lambda msg: None) -> tuple[str, list[Source]]:
         today = dt.date.today().isoformat()
         prompt = (
             f"Today is {today}.\nTopic: {topic}\nViewer's description: {description}\n\n"
             f"Below are {len(papers)} sources retrieved from scholarly databases (with abstracts):\n\n"
             f"{_format_sources(papers)}\n\n"
-            "Write a research brief in English for a science-video scriptwriter. Structure:\n"
-            "1. KEY FACTS - numbered, each one sentence, each ending with the source tag(s), "
+            + (f"EXPERT ANSWER (the basis of the video, to be verified):\n{answer}\n\n" if answer else "")
+            + "Write a research brief in English for a science-video scriptwriter. Structure:\n"
+            + ("0. VERIFICATION OF THE EXPERT ANSWER - for each main factual claim of the answer: "
+               "CONFIRMED (with source tags), NEEDS CORRECTION (what the sources say instead, with "
+               "tags) or NOT FOUND IN SOURCES.\n" if answer else "")
+            + "1. KEY FACTS - numbered, each one sentence, each ending with the source tag(s), "
             "e.g. [P3] or [P3][P7].\n"
             "2. LATEST DEVELOPMENTS - what changed in the last few years.\n"
             "3. OPEN QUESTIONS & DEBATES.\n"
@@ -118,7 +143,8 @@ class Writer:
         tools = []
         if self.s.use_web_search:
             prompt += (
-                "\nUse web search (limited to space agencies, observatories and journal sites) to "
+                "\nUse web search (limited to space agencies, observatories, journal sites and New "
+                "Scientist) to "
                 "verify the latest values and to add any important result newer than these papers "
                 "(e.g. new JWST/Euclid/LIGO/EHT/DESI results). Facts from web pages are cited "
                 "automatically; do not add P-tags to them.\n"
@@ -154,7 +180,7 @@ class Writer:
 
     # 3. Σενάριο -------------------------------------------------------------
     def write_script(self, topic: str, description: str, brief: str, sources: list[Source],
-                     minutes: float, language: str) -> VideoScript:
+                     minutes: float, language: str, answer: str = "") -> VideoScript:
         words = int(minutes * self.s.words_per_minute)
         scenes = max(6, min(16, round(minutes * 2.6)))
         return self._parse(
@@ -163,11 +189,20 @@ class Writer:
             "astrophysics documentaries (in the spirit of Kurzgesagt, PBS Space Time, ESA/Hubble "
             "videos): clear, vivid, accurate, never sensational.",
             f"Topic: {topic}\nViewer's description: {description}\n"
-            f"Narration language: {LANG_NAMES.get(language, language)}\n"
+            + f"Narration language: {LANG_NAMES.get(language, language)}\n"
             f"Target length: {minutes:g} minutes ≈ {words} words of narration in total "
-            f"(±10%), split into about {scenes} scenes.\n\n"
-            f"RESEARCH BRIEF:\n{brief}\n\nSOURCES:\n{_format_sources(sources, abstracts=False)}\n\n"
+            + f"(±10%), split into about {scenes} scenes.\n\n"
+            + (f"EXPERT ANSWER:\n{answer}\n\n" if answer else "")
+            + f"RESEARCH BRIEF:\n{brief}\n\nSOURCES:\n{_format_sources(sources, abstracts=False)}\n\n"
             "Write the video script:\n"
+            + ("- The EXPERT ANSWER is the backbone of the video: follow its explanation, its "
+               "structure and what it emphasises, turned into spoken narration. Apply every "
+               "correction from the VERIFICATION section of the brief. A claim marked NOT FOUND IN "
+               "SOURCES may stay only if it is well-established textbook physics; drop specific "
+               "numbers, dates or recent results that could not be verified. Add the newest results "
+               "from the brief where they fit.\n"
+               if answer else "")
+            + 
             "- Scene 1 is a hook: a striking question or fact that makes the viewer want to watch.\n"
             "- Then build understanding step by step; use one concrete analogy or scale comparison "
             "where it helps, but keep it physically correct.\n"
@@ -240,7 +275,7 @@ def _brief_with_web_tags(content, start: int) -> tuple[str, list[Source]]:
             if url not in by_url:
                 by_url[url] = Source(
                     id=f"W{start + len(by_url)}", title=getattr(c, "title", "") or url,
-                    url=url, kind="web", origin="web",
+                    url=url, kind=_web_kind(url), origin="web",
                     abstract=getattr(c, "cited_text", "") or "",
                 )
             tag = f"[{by_url[url].id}]"
@@ -248,6 +283,10 @@ def _brief_with_web_tags(content, start: int) -> tuple[str, list[Source]]:
                 tags.append(tag)
         parts.append(block.text + ("".join(tags) if tags else ""))
     return "".join(parts).strip(), list(by_url.values())
+
+
+def _web_kind(url: str) -> str:
+    return "magazine" if any(d in url for d in MAGAZINE_DOMAINS) else "web"
 
 
 def script_to_json(script: VideoScript) -> str:

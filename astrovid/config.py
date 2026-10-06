@@ -29,7 +29,10 @@ AUTHORITATIVE_DOMAINS = [
     "journals.aps.org",
     "arxiv.org",
     "adsabs.harvard.edu",
+    "newscientist.com",
 ]
+# Περιοδικά επιστημονικής δημοσιογραφίας: χρήσιμα για νέα και πλαίσιο, όχι peer-reviewed.
+MAGAZINE_DOMAINS = ["newscientist.com"]
 
 FONT_CANDIDATES = [
     os.environ.get("ASTROVID_FONT", ""),
@@ -50,9 +53,35 @@ FONT_BOLD_CANDIDATES = [
     "C:/Windows/Fonts/arialbd.ttf",
 ]
 
+# Φωνές Microsoft Edge (edge-tts) ανά γλώσσα αφήγησης: όνομα φωνής → περιγραφή.
+_MULTILINGUAL = {
+    "en-US-AndrewMultilingualNeural": "Andrew (πολυγλωσσική, ανδρική)",
+    "en-US-AvaMultilingualNeural": "Ava (πολυγλωσσική, γυναικεία)",
+    "en-US-BrianMultilingualNeural": "Brian (πολυγλωσσική, ανδρική)",
+    "en-US-EmmaMultilingualNeural": "Emma (πολυγλωσσική, γυναικεία)",
+}
 VOICES = {
-    "el": ["el-GR-NestorasNeural", "el-GR-AthinaNeural"],
-    "en": ["en-US-AndrewNeural", "en-US-AvaNeural", "en-GB-RyanNeural"],
+    "el": {
+        "el-GR-NestorasNeural": "Νέστορας (ελληνική, ανδρική)",
+        "el-GR-AthinaNeural": "Αθηνά (ελληνική, γυναικεία)",
+        **{k: v + " με αγγλική προφορά" for k, v in _MULTILINGUAL.items()},
+    },
+    "en": {
+        "en-US-AndrewNeural": "Andrew (US, ανδρική)",
+        "en-US-AvaNeural": "Ava (US, γυναικεία)",
+        "en-US-BrianNeural": "Brian (US, ανδρική)",
+        "en-US-EmmaNeural": "Emma (US, γυναικεία)",
+        "en-US-ChristopherNeural": "Christopher (US, ανδρική)",
+        "en-US-JennyNeural": "Jenny (US, γυναικεία)",
+        "en-US-GuyNeural": "Guy (US, ανδρική)",
+        "en-US-AriaNeural": "Aria (US, γυναικεία)",
+        "en-GB-RyanNeural": "Ryan (UK, ανδρική)",
+        "en-GB-SoniaNeural": "Sonia (UK, γυναικεία)",
+        "en-GB-ThomasNeural": "Thomas (UK, ανδρική)",
+        "en-GB-LibbyNeural": "Libby (UK, γυναικεία)",
+        "en-AU-NatashaNeural": "Natasha (Αυστραλία, γυναικεία)",
+        **_MULTILINGUAL,
+    },
 }
 
 

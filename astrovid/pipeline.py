@@ -43,6 +43,7 @@ class Result:
     script: VideoScript
     sources: list[Source]
     brief: str
+    answer: str = ""
     corrections: list[str] = field(default_factory=list)
     duration: float = 0.0
     warnings: list[str] = field(default_factory=list)
@@ -76,10 +77,15 @@ def generate(topic: str, description: str, *, minutes: float = 3.0, language: st
     warnings: list[str] = []
     writer = writer or Writer(s)
 
+    # 0. Η απάντηση του Claude στην ερώτηση: η βάση όλου του βίντεο -----------
+    progress("Το Claude απαντά στην ερώτηση…", 0.01)
+    answer = writer.answer(topic, description)
+    (folder / "claude_answer.md").write_text(answer, encoding="utf-8")
+
     # 1. Αναζήτηση βιβλιογραφίας ------------------------------------------
-    progress("Σχεδιασμός βιβλιογραφικής αναζήτησης…", 0.02)
-    plan = writer.plan(topic, description)
-    progress("Ερωτήματα: " + " | ".join(plan.queries), 0.05)
+    progress("Σχεδιασμός βιβλιογραφικής αναζήτησης για επαλήθευση της απάντησης…", 0.06)
+    plan = writer.plan(topic, description, answer)
+    progress("Ερωτήματα: " + " | ".join(plan.queries), 0.08)
     papers = gather_sources(plan.queries, max_papers=s.max_papers, ads_token=s.ads_token,
                             contact_email=s.contact_email, progress=lambda m: progress(m))
     n_ref = sum(p.kind in ("peer-reviewed", "review") for p in papers)
@@ -88,13 +94,14 @@ def generate(topic: str, description: str, *, minutes: float = 3.0, language: st
         warnings.append("Βρέθηκαν λίγες peer-reviewed πηγές· ελέγξτε προσεκτικά το αποτέλεσμα.")
 
     # 2. Έρευνα, σενάριο, έλεγχος -----------------------------------------
-    progress("Μελέτη πηγών και επαλήθευση νεότερων δεδομένων…", 0.18)
-    brief, web_sources = writer.research_brief(topic, description, papers, progress=lambda m: progress(m))
+    progress("Επαλήθευση της απάντησης με τις πηγές και τα νεότερα δεδομένα…", 0.18)
+    brief, web_sources = writer.research_brief(topic, description, papers, answer=answer,
+                                               progress=lambda m: progress(m))
     sources = papers + web_sources
     (folder / "research_brief.md").write_text(brief, encoding="utf-8")
 
     progress("Συγγραφή σεναρίου…", 0.35)
-    draft = writer.write_script(topic, description, brief, sources, minutes, language)
+    draft = writer.write_script(topic, description, brief, sources, minutes, language, answer=answer)
     progress("Επιστημονικός έλεγχος σεναρίου…", 0.45)
     reviewed = writer.fact_check(draft, brief, sources, language)
     script = reviewed.script
@@ -106,7 +113,7 @@ def generate(topic: str, description: str, *, minutes: float = 3.0, language: st
     _write_markdown(folder, topic, script, sources, by_id, reviewed.corrections)
 
     # 3. Αφήγηση ----------------------------------------------------------
-    voice = voice or VOICES.get(language, VOICES["en"])[0]
+    voice = voice or next(iter(VOICES.get(language, VOICES["en"])))
     tts = tts or EdgeTTS(voice)
     narrations = _narrate(script, tts, work, progress)
     total = sum(n.duration for n in narrations) + 0.6 * len(narrations) + 12
@@ -166,7 +173,7 @@ def generate(topic: str, description: str, *, minutes: float = 3.0, language: st
     duration = probe_duration(video)
     _write_credits(folder, pictures)
     progress(f"Έτοιμο! Διάρκεια {int(duration // 60)}:{int(duration % 60):02d}", 1.0)
-    return Result(folder, video, script, sources, brief, reviewed.corrections, duration, warnings)
+    return Result(folder, video, script, sources, brief, answer, reviewed.corrections, duration, warnings)
 
 
 # ---------------------------------------------------------------- helpers
@@ -223,7 +230,8 @@ def _write_markdown(folder: Path, topic: str, script: VideoScript, sources: list
 
     used = {s.id for s in _used_sources(script, by_id)}
     kinds = {"peer-reviewed": "Peer-reviewed", "review": "Άρθρο ανασκόπησης",
-             "preprint": "Preprint (χωρίς κρίση)", "web": "Ιστότοπος οργανισμού/περιοδικού"}
+             "preprint": "Preprint (χωρίς κρίση)", "web": "Ιστότοπος οργανισμού/περιοδικού",
+             "magazine": "Επιστημονική δημοσιογραφία (π.χ. New Scientist)"}
     bib = ["# Πηγές", "", "Με ★ οι πηγές που χρησιμοποιούνται στο βίντεο.", ""]
     for src in sources:
         star = "★ " if src.id in used else ""
