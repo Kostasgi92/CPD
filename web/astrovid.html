@@ -782,7 +782,7 @@ const hasSpeech = () => "speechSynthesis" in window && !!currentVoice();
 let voices = [];
 function currentVoice() { return voices.find((v) => v.voiceURI === $("voice").value) || null; }
 function loadVoices() {
-  if (!("speechSynthesis" in window)) { $("voiceNote").textContent = "Ο browser δεν υποστηρίζει σύνθεση φωνής· το βίντεο θα παίξει με υπότιτλους."; $("voiceNote").className = "note warn"; return; }
+  if (!("speechSynthesis" in window)) { $("voiceNote").textContent = "Εδώ δεν υπάρχει φωνή ανάγνωσης, οπότε το βίντεο παίζει μόνο με υπότιτλους. Αυτό συμβαίνει συνήθως μέσα στην εφαρμογή Claude για Android. Για να ακούσεις τη φωνή, άνοιξε τη σελίδα στο claude.ai από τον Chrome, τον Edge ή το Safari."; $("voiceNote").className = "note warn"; return; }
   voices = speechSynthesis.getVoices();
   const lang = project?.lang || "el", sel = $("voice"), prev = store.get("astrovid.voice." + lang, "");
   const match = voices.filter((v) => v.lang.toLowerCase().startsWith(lang));
